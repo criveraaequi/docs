@@ -1,0 +1,48 @@
+flowchart TD
+    Start([LLC decides to grant phantom<br/>equity to an employee])
+    PullVal[Aequi pulls from most recent<br/>valuation info for that LLC]
+
+    CF[["Contract Formation<br/><i>see subprocess diagram</i>"]]
+    CR[["Contract Revision<br/><i>see subprocess diagram</i>"]]
+    Produce[Aequi produces the<br/>employer/employee contracts]
+    Decision{Does employee<br/>accept terms?}
+    Grant[Employee is granted vesting schedule —<br/>visible on employee dashboard upon<br/>logging into Aequi]
+    Cliff[". . . After cliff . . ."]
+    VestBegin[Units begin to vest in<br/>employee's account, per contract]
+    VestContinue[Units continue vesting until<br/>vesting schedule ends]
+
+    Terminate[If employee/employer chooses to<br/>terminate the contract at any time]
+    Forfeit[Employee forfeits<br/>all unvested units]
+
+    Payout[["Payout Triggers<br/><i>see subprocess diagram</i>"]]
+
+    %% Main flow
+    Start --> PullVal
+    PullVal --> CF
+    CF --> Produce
+    CR --> Produce
+    Produce --> Decision
+    Decision -- "No — terms revised" --> CR
+    Decision -- "Yes — employee signs" --> Grant
+    Grant -.-> Cliff
+    Cliff --> VestBegin
+    VestBegin --> VestContinue
+    VestContinue --> Payout
+
+    %% Termination interrupt — reachable from signing through end of vesting
+    Grant -.->|"can terminate\nat any time"| Terminate
+    VestBegin -.->|"can terminate\nat any time"| Terminate
+    VestContinue -.->|"can terminate\nat any time"| Terminate
+    Terminate --> Forfeit
+    Forfeit --> Payout
+
+    %% Styling to mirror hand-drawn color coding
+    classDef subprocess fill:#1a1a2e,stroke:#6a5acd,stroke-width:2px,color:#fff
+    classDef decision fill:#2e1a1a,stroke:#e05c5c,stroke-width:2px,color:#fff
+    classDef interrupt fill:#1a1a1a,stroke:#ffffff,stroke-width:1px,color:#fff
+    classDef terminator fill:#0d2b45,stroke:#4da6ff,stroke-width:3px,color:#fff
+
+    class CF,CR subprocess
+    class Decision decision
+    class Terminate,Forfeit interrupt
+    class Payout terminator
