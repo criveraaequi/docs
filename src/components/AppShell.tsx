@@ -17,7 +17,7 @@ export function AppShell({ llc, owner, children }: AppShellProps) {
       <header className="topbar">
         <div className="brand-block">
           <Link className="wordmark" to="/">
-            <img src="/aequi-wordmark-lowercase-cream.png" alt="Aequi" />
+            <img src="/aequi-logo-transparent.png" alt="Aequi" />
           </Link>
           <div className="entity-label">
             <span>{llc.name}</span>

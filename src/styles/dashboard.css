@@ -3,7 +3,7 @@
 .brand-block, .topbar-actions, .user-block, .header-action, .icon-button, .card-heading, .pool-visual, .legend-item, .holder-row, .card-link, .chart-note, .modal-header, .modal-footer, .back-link, .document-link { display: flex; align-items: center; }
 .brand-block { gap: 24px; }
 .wordmark { display: flex; align-items: center; }
-.wordmark img { height: 64px; width: auto; display: block; }
+.wordmark img { height: 44px; width: auto; display: block; }
 .entity-label { display: flex; flex-direction: column; gap: 1px; padding-left: 24px; border-left: 1px solid var(--card-border); color: var(--slate); font-size: 12px; }
 .entity-label span:first-child { color: var(--navy); font-weight: 500; }
 .topbar-actions { gap: 20px; }
@@ -88,7 +88,7 @@
 }
 @media (max-width: 560px) {
   .entity-label { display: none; }
-  .wordmark img { height: 48px; }
+  .wordmark img { height: 34px; }
   .topbar-actions { gap: 13px; }
   .user-name, .header-action span { display: none; }
   .page-intro { align-items: flex-start; gap: 18px; }
