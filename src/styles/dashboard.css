@@ -32,6 +32,9 @@
 .pool-bar-segment { min-width: 2px; transition: width .45s ease, filter .15s ease; }
 .pool-bar-segment:hover { filter: brightness(1.12); }
 .pool-bar-segment + .pool-bar-segment { box-shadow: inset 1px 0 0 rgba(253, 252, 249, .55); }
+.scale-toggle { padding: 6px 10px; border: 1px solid var(--card-border); border-radius: 4px; color: var(--navy); font-size: 12px; font-weight: 500; transition: border-color .15s ease, color .15s ease; }
+.scale-toggle:hover { border-color: var(--navy); }
+.scale-toggle[aria-pressed="true"] { background: var(--navy); border-color: var(--navy); color: var(--card); }
 .pool-legend { display: grid; gap: 13px; }
 .legend-item { gap: 8px; color: var(--slate); font-size: 12px; }
 .legend-item strong { margin-left: auto; color: var(--navy); font-variant-numeric: tabular-nums; }
