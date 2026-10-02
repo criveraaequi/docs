@@ -9,23 +9,32 @@ interface EquityPoolSummaryProps {
 }
 
 const segmentColors = ["#1f3164", "#4a7c59", "#8a93a3", "#d9d7ce"];
+const poolRemainderColor = "#eceae2";
 
 type BarScale = "company" | "pool";
 
 export function EquityPoolSummary({ llc, holders }: EquityPoolSummaryProps) {
   const [scale, setScale] = useState<BarScale>("company");
 
-  const allocated = holders
-    .filter((holder) => holder.role !== null)
-    .reduce((sum, holder) => sum + holder.units, 0);
   const authorized = llc.totalUnitsAuthorized;
-  const scaleDenominator = scale === "company" ? authorized : allocated;
-  const scalePercent = scale === "company" ? 100 : (allocated / authorized) * 100;
+  const poolUnits = (llc.equityPoolPercent / 100) * authorized;
+  const roleHolders = holders.filter((holder) => holder.role !== null);
+  const allocatedUnits = roleHolders.reduce((sum, holder) => sum + holder.units, 0);
+  const poolRemainderUnits = Math.max(poolUnits - allocatedUnits, 0);
 
-  const segmentWidth = (holder: UnitHolderSegment) => {
-    const relative = (holder.units / scaleDenominator) * 100;
-    return scale === "company" ? relative : relative * (scalePercent / 100);
-  };
+  // Company view: each segment is units/authorized. Pool view: the whole bar
+  // is the equity pool, so each segment is units/poolUnits and the rest of the
+  // company is intentionally not drawn.
+  const denominator = scale === "company" ? authorized : poolUnits;
+
+  const segments = scale === "company"
+    ? holders
+    : [
+        ...roleHolders,
+        ...(poolRemainderUnits > 0
+          ? [{ label: "Pool remaining", role: null, units: poolRemainderUnits, percentOfPool: 0 }]
+          : []),
+      ];
 
   return (
     <section className="card summary-card">
@@ -53,29 +62,39 @@ export function EquityPoolSummary({ llc, holders }: EquityPoolSummaryProps) {
         <div
           className="pool-bar"
           role="img"
-          aria-label={`Pool allocation (${scale === "company" ? "share of company" : "share of equity pool"}): ${holders
+          aria-label={`Pool allocation (${scale === "company" ? "share of company" : "share of equity pool"}): ${roleHolders
             .map((holder) => `${holder.label} ${holder.percentOfPool.toFixed(1)}%`)
             .join(", ")}`}
         >
-          {holders.map((holder, index) => (
-            <div
-              className="pool-bar-segment"
-              key={holder.label}
-              style={{
-                width: `${segmentWidth(holder)}%`,
-                backgroundColor: segmentColors[index % segmentColors.length],
-              }}
-              title={`${holder.label} — ${holder.percentOfPool.toFixed(1)}% (${holder.units.toLocaleString()} units)`}
-            />
-          ))}
+          {segments.map((segment, index) => {
+            const color =
+              scale === "pool" && segment.label === "Pool remaining"
+                ? poolRemainderColor
+                : segmentColors[index % segmentColors.length];
+            return (
+              <div
+                className="pool-bar-segment"
+                key={segment.label}
+                style={{
+                  width: `${(segment.units / denominator) * 100}%`,
+                  backgroundColor: color,
+                }}
+                title={
+                  segment.label === "Pool remaining"
+                    ? `Unallocated pool — ${(segment.units / poolUnits * 100).toFixed(1)}% of pool (${segment.units.toLocaleString()} units)`
+                    : `${segment.label} — ${segment.percentOfPool.toFixed(1)}% (${segment.units.toLocaleString()} units)`
+                }
+              />
+            );
+          })}
         </div>
         <p className="pool-scale-note">
           {scale === "company"
-            ? `Segments show each holder's share of the full ${authorized.toLocaleString()}-unit company.`
-            : `Bar rescaled to the ${llc.equityPoolPercent}% equity pool — segments show each holder's share of issued units.`}
+            ? `Bar is the full ${authorized.toLocaleString()}-unit company.`
+            : `Bar is the ${llc.equityPoolPercent}% equity pool (${poolUnits.toLocaleString()} units) — holders shown as shares of the pool.`}
         </p>
         <div className="pool-legend" aria-label="Top unit holders">
-          {holders.map((holder, index) => (
+          {roleHolders.map((holder, index) => (
             <div className="legend-item" key={holder.label}>
               <span
                 className="legend-swatch"
@@ -89,7 +108,7 @@ export function EquityPoolSummary({ llc, holders }: EquityPoolSummaryProps) {
       </div>
       <div className="holder-list">
         <div className="list-header"><span>Holder</span><span>Share</span></div>
-        {holders.filter((holder) => holder.role).map((holder) => (
+        {roleHolders.map((holder) => (
           <div className="holder-row" key={holder.label}>
             <div><strong>{holder.label}</strong><span>{holder.role}</span></div>
             <strong className="tnum">{holder.percentOfPool.toFixed(1)}%</strong>
