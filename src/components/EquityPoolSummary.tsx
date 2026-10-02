@@ -20,21 +20,22 @@ export function EquityPoolSummary({ llc, holders }: EquityPoolSummaryProps) {
   const poolUnits = (llc.equityPoolPercent / 100) * authorized;
   const roleHolders = holders.filter((holder) => holder.role !== null);
   const allocatedUnits = roleHolders.reduce((sum, holder) => sum + holder.units, 0);
-  const poolRemainderUnits = Math.max(poolUnits - allocatedUnits, 0);
 
-  // Company view: each segment is units/authorized. Pool view: the whole bar
-  // is the equity pool, so each segment is units/poolUnits and the rest of the
-  // company is intentionally not drawn.
+  // Company view: each segment is units/authorized and the tail is the rest of
+  // the company. Pool view: the bar is the 10% pool, so each segment is
+  // units/poolUnits and the tail is unallocated pool capacity. The tail keeps
+  // one stable key so it morphs rather than remounts when toggling.
   const denominator = scale === "company" ? authorized : poolUnits;
+  const tailUnits = scale === "company"
+    ? Math.max(authorized - allocatedUnits, 0)
+    : Math.max(poolUnits - allocatedUnits, 0);
 
-  const segments = scale === "company"
-    ? holders
-    : [
-        ...roleHolders,
-        ...(poolRemainderUnits > 0
-          ? [{ label: "Pool remaining", role: null, units: poolRemainderUnits, percentOfPool: 0 }]
-          : []),
-      ];
+  const segments = [
+    ...roleHolders,
+    ...(tailUnits > 0
+      ? [{ label: "remainder", role: null, units: tailUnits, percentOfPool: 0 }]
+      : []),
+  ];
 
   return (
     <section className="card summary-card">
@@ -67,10 +68,10 @@ export function EquityPoolSummary({ llc, holders }: EquityPoolSummaryProps) {
             .join(", ")}`}
         >
           {segments.map((segment, index) => {
-            const color =
-              scale === "pool" && segment.label === "Pool remaining"
-                ? poolRemainderColor
-                : segmentColors[index % segmentColors.length];
+            const isTail = segment.label === "remainder";
+            const color = isTail
+              ? scale === "company" ? "#d9d7ce" : poolRemainderColor
+              : segmentColors[index % segmentColors.length];
             return (
               <div
                 className="pool-bar-segment"
@@ -80,8 +81,10 @@ export function EquityPoolSummary({ llc, holders }: EquityPoolSummaryProps) {
                   backgroundColor: color,
                 }}
                 title={
-                  segment.label === "Pool remaining"
-                    ? `Unallocated pool — ${(segment.units / poolUnits * 100).toFixed(1)}% of pool (${segment.units.toLocaleString()} units)`
+                  isTail
+                    ? scale === "company"
+                      ? `Not in pool — ${(segment.units / authorized * 100).toFixed(1)}% of company (${segment.units.toLocaleString()} units)`
+                      : `Unallocated pool — ${(segment.units / poolUnits * 100).toFixed(1)}% of pool (${segment.units.toLocaleString()} units)`
                     : `${segment.label} — ${segment.percentOfPool.toFixed(1)}% (${segment.units.toLocaleString()} units)`
                 }
               />
