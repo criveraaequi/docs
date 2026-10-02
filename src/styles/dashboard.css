@@ -24,12 +24,15 @@
 .card-heading { justify-content: space-between; align-items: flex-start; margin-bottom: 28px; }
 .card-heading h2 { font-size: 19px; }
 .pool-size, .updated-label { color: var(--slate); font-size: 12px; }
-.pool-visual { gap: 36px; min-height: 194px; }
-.donut { flex: 0 0 188px; width: 188px; height: 188px; border-radius: 50%; display: grid; place-items: center; }
-.donut-center { width: 125px; height: 125px; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 50%; background: var(--card); }
-.donut-center strong { font: 600 22px/1 var(--font-serif); }
-.donut-center span { color: var(--slate); font-size: 11px; margin-top: 7px; }
-.pool-legend { flex: 1; display: grid; gap: 13px; }
+.pool-visual { display: grid; gap: 18px; min-height: 194px; align-content: start; }
+.pool-stat { display: flex; align-items: baseline; gap: 10px; }
+.pool-stat strong { font: 600 30px/1.1 var(--font-serif); letter-spacing: -.02em; color: var(--navy); }
+.pool-stat span { color: var(--slate); font-size: 13px; }
+.pool-bar { display: flex; width: 100%; height: 26px; border-radius: 5px; overflow: hidden; background: #eceae2; }
+.pool-bar-segment { min-width: 2px; transition: width .45s ease, filter .15s ease; }
+.pool-bar-segment:hover { filter: brightness(1.12); }
+.pool-bar-segment + .pool-bar-segment { box-shadow: inset 1px 0 0 rgba(253, 252, 249, .55); }
+.pool-legend { display: grid; gap: 13px; }
 .legend-item { gap: 8px; color: var(--slate); font-size: 12px; }
 .legend-item strong { margin-left: auto; color: var(--navy); font-variant-numeric: tabular-nums; }
 .legend-swatch { width: 8px; height: 8px; flex: 0 0 8px; }
@@ -93,10 +96,7 @@
   .user-name, .header-action span { display: none; }
   .page-intro { align-items: flex-start; gap: 18px; }
   .page-intro h1 { font-size: 26px; }
-  .pool-visual { gap: 20px; }
-  .donut { flex-basis: 145px; width: 145px; height: 145px; }
-  .donut-center { width: 98px; height: 98px; }
-  .donut-center strong { font-size: 17px; }
+  .pool-visual { gap: 14px; }
   .history-table-header, .history-row { grid-template-columns: 1fr 1fr; }
   .history-table-header span:nth-child(n+3), .history-row span:nth-child(n+3) { display: none; }
   .modal-grid { grid-template-columns: 1fr; }

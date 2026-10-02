@@ -10,14 +10,6 @@ interface EquityPoolSummaryProps {
 const segmentColors = ["#1f3164", "#4a7c59", "#8a93a3", "#d9d7ce"];
 
 export function EquityPoolSummary({ llc, holders }: EquityPoolSummaryProps) {
-  const conicStops = holders
-    .map((holder, index) => `${segmentColors[index % segmentColors.length]} ${holder.percentOfPool}%`)
-    .reduce((stops, stop, index) => {
-      const prior = index === 0 ? 0 : holders.slice(0, index).reduce((sum, item) => sum + item.percentOfPool, 0);
-      return [...stops, `${stop.replace(`${holders[index].percentOfPool}%`, `${prior}% ${prior + holders[index].percentOfPool}%`)}`];
-    }, [] as string[])
-    .join(", ");
-
   return (
     <section className="card summary-card">
       <div className="card-heading">
@@ -28,16 +20,38 @@ export function EquityPoolSummary({ llc, holders }: EquityPoolSummaryProps) {
         <span className="pool-size">Pool: {llc.equityPoolPercent}%</span>
       </div>
       <div className="pool-visual">
-        <div className="donut" style={{ background: `conic-gradient(${conicStops})` }}>
-          <div className="donut-center">
-            <strong>{llc.unitsIssued.toLocaleString()}</strong>
-            <span>issued units</span>
-          </div>
+        <div className="pool-stat">
+          <strong>{llc.unitsIssued.toLocaleString()}</strong>
+          <span>
+            issued units of {llc.totalUnitsAuthorized.toLocaleString()} authorized
+          </span>
+        </div>
+        <div
+          className="pool-bar"
+          role="img"
+          aria-label={`Pool allocation: ${holders
+            .map((holder) => `${holder.label} ${holder.percentOfPool.toFixed(1)}%`)
+            .join(", ")}`}
+        >
+          {holders.map((holder, index) => (
+            <div
+              className="pool-bar-segment"
+              key={holder.label}
+              style={{
+                width: `${holder.percentOfPool}%`,
+                backgroundColor: segmentColors[index % segmentColors.length],
+              }}
+              title={`${holder.label} — ${holder.percentOfPool.toFixed(1)}% (${holder.units.toLocaleString()} units)`}
+            />
+          ))}
         </div>
         <div className="pool-legend" aria-label="Top unit holders">
           {holders.map((holder, index) => (
             <div className="legend-item" key={holder.label}>
-              <span className="legend-swatch" style={{ backgroundColor: segmentColors[index % segmentColors.length] }} />
+              <span
+                className="legend-swatch"
+                style={{ backgroundColor: segmentColors[index % segmentColors.length] }}
+              />
               <span>{holder.label}</span>
               <strong>{holder.percentOfPool.toFixed(1)}%</strong>
             </div>
