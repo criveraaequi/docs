@@ -105,6 +105,7 @@ export function getTopUnitHolders(
 
   const segments: UnitHolderSegment[] = employees.map((employee) => ({
     label: employee.name,
+    employeeId: employee.id,
     role: employee.roleOrPosition,
     units: employee.grant?.unitsAwarded ?? 0,
     percentOfPool: ((employee.grant?.unitsAwarded ?? 0) / totalUnits) * 100,

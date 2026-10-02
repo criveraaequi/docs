@@ -158,6 +158,7 @@ export interface AnalystLLCEngagement {
 
 export interface UnitHolderSegment {
   label: string; // employee name or "Other / Unallocated"
+  employeeId?: string; // set for real employees so screens can link to their pages
   role: string | null; // employee role, null for unallocated
   units: number;
   percentOfPool: number; // share of total issued units

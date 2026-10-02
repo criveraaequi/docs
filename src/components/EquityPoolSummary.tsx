@@ -103,7 +103,13 @@ export function EquityPoolSummary({ llc, holders }: EquityPoolSummaryProps) {
                 className="legend-swatch"
                 style={{ backgroundColor: segmentColors[index % segmentColors.length] }}
               />
-              <span>{holder.label}</span>
+              {holder.employeeId ? (
+                <Link className="holder-link" to={`/employees/${holder.employeeId}`}>
+                  {holder.label}
+                </Link>
+              ) : (
+                <span>{holder.label}</span>
+              )}
               <strong>{holder.percentOfPool.toFixed(1)}%</strong>
             </div>
           ))}
@@ -113,7 +119,16 @@ export function EquityPoolSummary({ llc, holders }: EquityPoolSummaryProps) {
         <div className="list-header"><span>Holder</span><span>Share</span></div>
         {roleHolders.map((holder) => (
           <div className="holder-row" key={holder.label}>
-            <div><strong>{holder.label}</strong><span>{holder.role}</span></div>
+            <div>
+              {holder.employeeId ? (
+                <Link className="holder-link" to={`/employees/${holder.employeeId}`}>
+                  {holder.label}
+                </Link>
+              ) : (
+                <strong>{holder.label}</strong>
+              )}
+              <span>{holder.role}</span>
+            </div>
             <strong className="tnum">{holder.percentOfPool.toFixed(1)}%</strong>
           </div>
         ))}
