@@ -80,12 +80,40 @@
 .grant-fact:last-child { border-bottom: none; }
 .grant-fact span { color: var(--slate); font-size: 12px; }
 .grant-fact strong { font-weight: 500; font-size: 13px; text-align: right; }
+.vesting-progress { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--card-border); display: grid; gap: 10px; }
+.vesting-progress-header { display: flex; justify-content: space-between; align-items: baseline; }
+.vesting-progress-header span { color: var(--slate); font-size: 11px; text-transform: uppercase; letter-spacing: .07em; }
+.vesting-progress-header strong { font-size: 13px; font-weight: 500; }
+.vesting-progress-bar { height: 10px; border-radius: 5px; background: #eceae2; overflow: hidden; }
+.vesting-progress-fill { height: 100%; border-radius: 5px; background: var(--navy); transition: width .5s ease; }
+
+.payout-hero { display: grid; gap: 18px; padding: 28px 28px 24px; }
+.payout-hero-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; }
+.payout-employee { font: 600 26px/1.2 var(--font-serif); letter-spacing: -.01em; color: var(--navy); }
+.payout-company { color: var(--slate); font-weight: 500; }
+.payout-units { display: inline-block; margin-top: 7px; color: var(--slate); font-size: 12px; text-transform: uppercase; letter-spacing: .07em; }
+.payout-headline { display: flex; align-items: baseline; gap: 14px; }
+.payout-headline strong { font: 600 42px/1.05 var(--font-serif); letter-spacing: -.02em; color: var(--navy); font-variant-numeric: tabular-nums; }
+.payout-headline span { color: var(--slate); font-size: 13px; font-weight: 500; letter-spacing: .05em; }
+.payout-projected { color: var(--slate); font-size: 13px; margin: -6px 0 0; }
+.payout-projected strong { color: var(--navy); font-weight: 600; }
+.payout-chart-card { display: grid; gap: 8px; }
+.payout-chart { height: 300px; }
+.payout-stat-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; padding: 14px 24px 20px; border-top: 1px solid var(--card-border); }
+.payout-stat { display: grid; gap: 4px; }
+.payout-stat span { color: var(--slate); font-size: 11px; text-transform: uppercase; letter-spacing: .07em; }
+.payout-stat strong { font-size: 15px; font-weight: 600; color: var(--navy); }
+
 @media (max-width: 1100px) {
   .vesting-stats { grid-template-columns: repeat(3, 1fr); }
   .vesting-grid { grid-template-columns: 1fr; }
+  .payout-stat-row { grid-template-columns: repeat(3, 1fr); row-gap: 18px; }
 }
 @media (max-width: 800px) {
   .vesting-stats { grid-template-columns: repeat(2, 1fr); }
+  .payout-headline strong { font-size: 32px; }
+  .payout-hero-header { flex-direction: column; }
+  .payout-stat-row { grid-template-columns: repeat(2, 1fr); }
 }
 .document-link { gap: 5px; color: var(--green); font-size: 12px; }
 .modal-backdrop { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 24px; background: rgba(31, 49, 100, .3); }

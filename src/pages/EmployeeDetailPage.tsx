@@ -1,38 +1,50 @@
 import { ArrowLeft, ArrowUpRight } from "lucide-react";
-import { useMemo } from "react";
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   Area,
   AreaChart,
   CartesianGrid,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
 import { AppShell } from "@/components/AppShell";
-import { getAuthorizedUser, getEmployee, getLLCDetails } from "@/data/mockApi";
-import type { EquityGrant } from "@/data/types";
 import { formatDate } from "@/components/ValuationDetailModal";
+import { getAuthorizedUser, getEmployee, getLLCDetails } from "@/data/mockApi";
+import type { EquityGrant, ValuationEvent } from "@/data/types";
 
 const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
 interface VestingPoint {
   label: string;
-  vested: number;
+  vestedUnits: number;
+  vestedValue: number;
   isCliff: boolean;
 }
 
-function buildVestingSeries(grant: EquityGrant): VestingPoint[] {
+function monthsBetween(fromIso: string, toIso: string): number {
+  return Math.round(
+    ((new Date(toIso).getTime() - new Date(fromIso).getTime()) / (365.25 * 24 * 60 * 60 * 1000)) * 12
+  );
+}
+
+/** Certified per-unit price in force at a given date (last valuation on or before it). */
+function priceAt(history: ValuationEvent[], isoDate: string): number {
+  const time = new Date(isoDate).getTime();
+  let price = history[0].resultingStrikePrice;
+  for (const event of history) {
+    if (new Date(event.date).getTime() <= time) price = event.resultingStrikePrice;
+  }
+  return price;
+}
+
+function buildVestingSeries(grant: EquityGrant, valuationHistory: ValuationEvent[]): VestingPoint[] {
   const { unitsAwarded, vesting } = grant;
   const months = vesting.scheduleLengthMonths;
-  const cliffMonths = Math.max(
-    Math.round(
-      (new Date(vesting.cliffDate).getTime() - new Date(vesting.grantDate).getTime()) /
-        (365.25 * 24 * 60 * 60 * 1000) * 12
-    ),
-    0
-  );
+  const cliffMonths = Math.max(monthsBetween(vesting.grantDate, vesting.cliffDate), 0);
   const monthsAfterCliff = Math.max(months - cliffMonths, 1);
   const monthlyAfterCliff = unitsAwarded / monthsAfterCliff;
 
@@ -40,17 +52,24 @@ function buildVestingSeries(grant: EquityGrant): VestingPoint[] {
   for (let month = 0; month <= months; month += 1) {
     const date = new Date(vesting.grantDate);
     date.setMonth(date.getMonth() + month);
-    const vested =
+    const iso = date.toISOString().slice(0, 10);
+    const vestedUnits =
       month < cliffMonths
         ? 0
         : Math.min(Math.round((month - cliffMonths) * monthlyAfterCliff), unitsAwarded);
     points.push({
       label: date.toLocaleDateString("en-US", { month: "short", year: "2-digit" }),
-      vested,
+      vestedUnits,
+      vestedValue: Math.round(vestedUnits * priceAt(valuationHistory, iso)),
       isCliff: month === cliffMonths,
     });
   }
   return points;
+}
+
+function formatYears(months: number): string {
+  if (months % 12 === 0) return `${months / 12} yr${months === 12 ? "" : "s"}`;
+  return `${months} mo`;
 }
 
 export function EmployeeDetailPage() {
@@ -58,11 +77,11 @@ export function EmployeeDetailPage() {
   const employee = employeeId ? getEmployee(employeeId) : null;
   const llc = employee ? getLLCDetails(employee.llcId) : null;
   const owner = llc ? getAuthorizedUser(llc.id) : null;
+  const [showValue, setShowValue] = useState(true);
 
-  const vestingSeries = useMemo(
-    () => (employee?.grant ? buildVestingSeries(employee.grant) : []),
-    [employee]
-  );
+  const grant = employee?.grant ?? null;
+  const history = llc?.valuationHistory ?? [];
+  const series = grant && history.length > 0 ? buildVestingSeries(grant, history) : [];
 
   if (!employee || !llc) {
     return (
@@ -73,128 +92,175 @@ export function EmployeeDetailPage() {
     );
   }
 
-  const grant = employee.grant;
-  const cliffLabel = grant ? formatDate(grant.vesting.cliffDate) : "—";
-  const fullyVestedLabel = grant ? formatDate(grant.vesting.vestingCompletionDate) : "—";
-  const vestedPercent = grant && grant.unitsAwarded > 0
-    ? Math.min((grant.currentVestedAmount / grant.unitsAwarded) * 100, 100)
-    : 0;
-
-  return (
-    <AppShell llc={llc} owner={owner}>
-      <div className="history-page">
-        <Link className="back-link" to="/">
-          <ArrowLeft size={15} /> Back to dashboard
-        </Link>
-        <div className="page-intro history-intro">
-          <div>
-            <span className="eyebrow">Equity grant · {llc.name}</span>
-            <h1>{employee.name}</h1>
-            <p>
-              {employee.roleOrPosition} · {employee.employmentStatus === "active" ? "Active" : "Terminated"}
-              {employee.terminationDate ? ` ${formatDate(employee.terminationDate)}` : ""}
-            </p>
+  if (!grant) {
+    return (
+      <AppShell llc={llc} owner={owner}>
+        <div className="history-page">
+          <Link className="back-link" to="/"><ArrowLeft size={15} /> Back to dashboard</Link>
+          <div className="page-intro history-intro">
+            <div>
+              <span className="eyebrow">Equity grant · {llc.name}</span>
+              <h1>{employee.name}</h1>
+              <p>{employee.roleOrPosition}</p>
+            </div>
+            <span className="mock-badge">Mock data</span>
           </div>
-          <span className="mock-badge">Mock data</span>
-        </div>
-
-        {grant ? (
-          <>
-            <div className="vesting-stats">
-              <section className="card stat-card">
-                <span className="stat-label">Units awarded</span>
-                <strong>{grant.unitsAwarded.toLocaleString()}</strong>
-                <span className="stat-sub">phantom units</span>
-              </section>
-              <section className="card stat-card">
-                <span className="stat-label">Unit price (strike)</span>
-                <strong>${grant.strikePricePerUnit.toFixed(2)}</strong>
-                <span className="stat-sub">per unit, set at grant</span>
-              </section>
-              <section className="card stat-card">
-                <span className="stat-label">Vested to date</span>
-                <strong>{grant.currentVestedAmount.toLocaleString()}</strong>
-                <span className="stat-sub">units · {vestedPercent.toFixed(0)}% of grant</span>
-              </section>
-              <section className="card stat-card">
-                <span className="stat-label">Vested value</span>
-                <strong>{currency.format(grant.currentPayoutValue)}</strong>
-                <span className="stat-sub">vested units × current unit price</span>
-              </section>
-              <section className="card stat-card">
-                <span className="stat-label">Fully vested</span>
-                <strong>{fullyVestedLabel}</strong>
-                <span className="stat-sub">{grant.vesting.scheduleLengthMonths}-month schedule</span>
-              </section>
-            </div>
-
-            <div className="vesting-grid">
-              <section className="card">
-                <div className="card-heading">
-                  <div>
-                    <span className="eyebrow">Vesting schedule</span>
-                    <h2>Cumulative units vested</h2>
-                  </div>
-                  <span className="updated-label">
-                    Grant {formatDate(grant.vesting.grantDate)} · Cliff {cliffLabel}
-                  </span>
-                </div>
-                <div className="chart-wrap">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={vestingSeries} margin={{ top: 16, right: 12, left: -14, bottom: 4 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(138, 147, 163, .18)" vertical={false} />
-                      <XAxis dataKey="label" tick={{ fill: "#8a93a3", fontSize: 11 }} tickLine={false} axisLine={false} minTickGap={28} />
-                      <YAxis hide domain={[0, grant.unitsAwarded]} />
-                      <Tooltip
-                        cursor={{ stroke: "rgba(138, 147, 163, .35)" }}
-                        contentStyle={{ border: "1px solid rgba(138, 147, 163, .25)", borderRadius: 5, background: "#fdfcf9", fontFamily: "IBM Plex Sans" }}
-                        formatter={(value: unknown) => [`${Number(value).toLocaleString()} units`, "Vested"]}
-                        labelFormatter={(label: unknown) => String(label)}
-                      />
-                      <Area
-                        type="stepAfter"
-                        dataKey="vested"
-                        stroke="#1f3164"
-                        strokeWidth={2}
-                        fill="rgba(31, 49, 100, .08)"
-                        dot={false}
-                        activeDot={{ r: 5, fill: "#1f3164", stroke: "#fdfcf9", strokeWidth: 2 }}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-                <p className="chart-note">
-                  <span className="chart-line" /> Flat until the 1-year cliff ({cliffLabel}), then
-                  {" "}{grant.vesting.monthlyVestingRate.toFixed(2).replace(/\.00$/, "")} units/month until fully vested on {fullyVestedLabel}.
-                </p>
-              </section>
-
-              <section className="card">
-                <div className="card-heading">
-                  <div>
-                    <span className="eyebrow">Grant facts</span>
-                    <h2>Details</h2>
-                  </div>
-                </div>
-                <div className="grant-facts">
-                  <div className="grant-fact"><span>Issue date</span><strong>{formatDate(grant.grantDate)}</strong></div>
-                  <div className="grant-fact"><span>Cliff date</span><strong>{cliffLabel}</strong></div>
-                  <div className="grant-fact"><span>Fully vested</span><strong>{fullyVestedLabel}</strong></div>
-                  <div className="grant-fact"><span>Vesting length</span><strong>{grant.vesting.scheduleLengthMonths} months</strong></div>
-                  <div className="grant-fact"><span>Monthly rate</span><strong>{grant.vesting.monthlyVestingRate.toFixed(2).replace(/\.00$/, "")} units</strong></div>
-                  <div className="grant-fact">
-                    <span>Equity agreement</span>
-                    <strong className="document-link">{grant.contractDocumentName} <ArrowUpRight size={14} /></strong>
-                  </div>
-                </div>
-              </section>
-            </div>
-          </>
-        ) : (
           <section className="card">
             <p className="empty-state">No equity grant has been issued for this employee yet.</p>
           </section>
-        )}
+        </div>
+      </AppShell>
+    );
+  }
+
+  const cliffMonths = Math.max(monthsBetween(grant.vesting.grantDate, grant.vesting.cliffDate), 0);
+  const cliffLabel = formatDate(grant.vesting.cliffDate);
+  const fullyVestedLabel = formatDate(grant.vesting.vestingCompletionDate);
+  const latestValuation = history[history.length - 1];
+  const currentPrice = latestValuation?.resultingStrikePrice ?? grant.strikePricePerUnit;
+  const initialPrice = grant.strikePricePerUnit;
+  const finalPrice = latestValuation?.resultingStrikePrice ?? initialPrice;
+
+  const avgYoY =
+    history.length >= 2
+      ? (() => {
+          const first = history[0];
+          const last = history[history.length - 1];
+          const years = (new Date(last.date).getTime() - new Date(first.date).getTime()) / (365.25 * 24 * 60 * 60 * 1000);
+          if (years <= 0 || first.resultingStrikePrice <= 0) return null;
+          return (Math.pow(last.resultingStrikePrice / first.resultingStrikePrice, 1 / years) - 1) * 100;
+        })()
+      : null;
+
+  const vestedPercent = grant.unitsAwarded > 0
+    ? Math.min((grant.currentVestedAmount / grant.unitsAwarded) * 100, 100)
+    : 0;
+  const stillInCliff = grant.currentVestedAmount === 0 && vestedPercent < 100;
+  const projectedPayout = grant.unitsAwarded * currentPrice;
+
+  const dataKey = showValue ? "vestedValue" : "vestedUnits";
+  const formatTick = (value: number) =>
+    showValue
+      ? `$${value >= 1000 ? `${(value / 1000).toFixed(value >= 10000 ? 0 : 1)}k` : value.toFixed(0)}`
+      : value.toLocaleString();
+  const cliffPoint = series.find((point) => point.isCliff);
+
+  return (
+    <AppShell llc={llc} owner={owner}>
+      <div className="history-page employee-page">
+        <Link className="back-link" to="/"><ArrowLeft size={15} /> Back to dashboard</Link>
+
+        <section className="card payout-hero">
+          <div className="payout-hero-header">
+            <div>
+              <h1 className="payout-employee">{employee.name} <span className="payout-company">· {llc.name}</span></h1>
+              <span className="payout-units">{grant.unitsAwarded.toLocaleString()} units</span>
+            </div>
+            <button
+              className="scale-toggle"
+              type="button"
+              onClick={() => setShowValue((current) => !current)}
+              aria-pressed={showValue}
+            >
+              {showValue ? "Show vested units" : "Show vested value"}
+            </button>
+          </div>
+          <div className="payout-headline">
+            <strong>{currency.format(showValue ? grant.currentPayoutValue : grant.currentVestedAmount)}</strong>
+            <span>TOTAL VESTED {showValue ? "PAYOUT" : "UNITS"}</span>
+          </div>
+          {stillInCliff && (
+            <p className="payout-projected">
+              Projected value upon vesting: <strong>{currency.format(projectedPayout)}</strong>
+              <span> — all {grant.unitsAwarded.toLocaleString()} units × ${currentPrice.toFixed(2)} current unit price, if held to {fullyVestedLabel}</span>
+            </p>
+          )}
+        </section>
+
+        <section className="card payout-chart-card">
+          <div className="chart-wrap payout-chart">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={series} margin={{ top: 24, right: 16, left: 4, bottom: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(138, 147, 163, .18)" vertical={false} />
+                <XAxis dataKey="label" tick={{ fill: "#8a93a3", fontSize: 11 }} tickLine={false} axisLine={false} minTickGap={28} />
+                <YAxis
+                  tick={{ fill: "#8a93a3", fontSize: 11 }}
+                  tickLine={false}
+                  axisLine={false}
+                  width={58}
+                  domain={[0, showValue ? Math.max(...series.map((p) => p.vestedValue)) : grant.unitsAwarded]}
+                  tickFormatter={formatTick}
+                />
+                <Tooltip
+                  cursor={{ stroke: "rgba(138, 147, 163, .35)" }}
+                  contentStyle={{ border: "1px solid rgba(138, 147, 163, .25)", borderRadius: 5, background: "#fdfcf9", fontFamily: "IBM Plex Sans" }}
+                  formatter={(value: unknown) =>
+                    showValue
+                      ? [currency.format(Number(value)), "Vested value"]
+                      : [`${Number(value).toLocaleString()} units`, "Vested units"]
+                  }
+                  labelFormatter={(label: unknown) => String(label)}
+                />
+                {cliffPoint && (
+                  <ReferenceLine
+                    x={cliffPoint.label}
+                    stroke="#b07d3a"
+                    strokeDasharray="5 4"
+                    label={{ value: "CLIFF · YR 1", position: "top", fill: "#b07d3a", fontSize: 10, letterSpacing: "0.08em" }}
+                  />
+                )}
+                <Area
+                  type="monotone"
+                  dataKey={dataKey}
+                  stroke="#1f3164"
+                  strokeWidth={2.5}
+                  fill="rgba(31, 49, 100, .1)"
+                  dot={{ r: 3, fill: "#1f3164", strokeWidth: 0 }}
+                  activeDot={{ r: 5, fill: "#1f3164", stroke: "#fdfcf9", strokeWidth: 2 }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="payout-stat-row">
+            <div className="payout-stat"><span>Vesting</span><strong>{formatYears(grant.vesting.scheduleLengthMonths)}</strong></div>
+            <div className="payout-stat"><span>Cliff</span><strong>{formatYears(cliffMonths)}</strong></div>
+            <div className="payout-stat"><span>Initial price</span><strong>${initialPrice.toFixed(2)}</strong></div>
+            <div className="payout-stat"><span>Final price</span><strong>${finalPrice.toFixed(2)}</strong></div>
+            <div className="payout-stat"><span>Avg YoY</span><strong>{avgYoY === null ? "—" : `${avgYoY.toFixed(2)}%`}</strong></div>
+          </div>
+        </section>
+
+        <section className="card">
+          <div className="card-heading">
+            <div>
+              <span className="eyebrow">Grant details</span>
+              <h2>Schedule &amp; agreement</h2>
+            </div>
+            <span className="updated-label">
+              {employee.roleOrPosition} · {employee.employmentStatus === "active" ? "Active" : `Terminated ${formatDate(employee.terminationDate ?? "")}`}
+            </span>
+          </div>
+          <div className="grant-facts">
+            <div className="grant-fact"><span>Issue date</span><strong>{formatDate(grant.grantDate)}</strong></div>
+            <div className="grant-fact"><span>Cliff date</span><strong>{cliffLabel}</strong></div>
+            <div className="grant-fact"><span>Fully vested</span><strong>{fullyVestedLabel}</strong></div>
+            <div className="grant-fact"><span>Monthly rate</span><strong>{grant.vesting.monthlyVestingRate.toFixed(2).replace(/\.00$/, "")} units</strong></div>
+            <div className="grant-fact"><span>Units awarded</span><strong>{grant.unitsAwarded.toLocaleString()}</strong></div>
+            <div className="grant-fact">
+              <span>Equity agreement</span>
+              <strong className="document-link">{grant.contractDocumentName} <ArrowUpRight size={14} /></strong>
+            </div>
+          </div>
+          <div className="vesting-progress">
+            <div className="vesting-progress-header">
+              <span>Vesting progress</span>
+              <strong>{grant.currentVestedAmount.toLocaleString()} of {grant.unitsAwarded.toLocaleString()} units · {vestedPercent.toFixed(0)}%</strong>
+            </div>
+            <div className="vesting-progress-bar">
+              <div className="vesting-progress-fill" style={{ width: `${vestedPercent}%` }} />
+            </div>
+          </div>
+        </section>
       </div>
     </AppShell>
   );
