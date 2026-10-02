@@ -1,0 +1,114 @@
+:root {
+  /* Brand palette */
+  --navy: #1f3164;
+  --cream: #f3f1ea;
+  --slate: #8a93a3;
+
+  /* Functional accents */
+  --green: #4a7c59;
+  --amber: #b8763e;
+
+  /* Surfaces */
+  --card: #fdfcf9;
+  --card-border: rgba(138, 147, 163, 0.25);
+
+  /* Typography */
+  --font-serif: "Roboto Slab", Georgia, serif;
+  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+
+  /* Spacing (8px system) */
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 32px;
+  --space-5: 48px;
+
+  /* Radius */
+  --radius: 5px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background-color: var(--cream);
+  color: var(--navy);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-serif);
+  color: var(--navy);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+table {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Utility: tabular numbers anywhere */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Card surface */
+.card {
+  background-color: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+}
+
+/* Hairline divider */
+.hairline {
+  border: none;
+  border-top: 1px solid var(--card-border);
+  margin: 0;
+}
+
+/* Slate text */
+.text-slate {
+  color: var(--slate);
+}
+
+/* Link */
+.link {
+  color: var(--navy);
+  text-decoration: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+button {
+  font-family: var(--font-sans);
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}

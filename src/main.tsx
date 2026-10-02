@@ -1,17 +1,25 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { OwnerDashboard } from "@/pages/OwnerDashboard";
+import { ValuationHistoryPage } from "@/pages/ValuationHistoryPage";
+import { EmployeeListPlaceholder } from "@/pages/EmployeeListPlaceholder";
+import "@/styles/global.css";
+import "@/styles/dashboard.css";
 
-export default function App() {
-  return (
-    <div style={{ padding: "2rem", fontFamily: "system-ui, sans-serif" }}>
-      <h1>Aequi — Data Layer Initialized</h1>
-      <p>Mock data functions are set up. No screens built yet.</p>
-    </div>
-  );
+function App() {
+  return <Routes>
+    <Route path="/" element={<OwnerDashboard />} />
+    <Route path="/valuation-history/:llcId" element={<ValuationHistoryRoute />} />
+    <Route path="/employees" element={<EmployeeListPlaceholder />} />
+    <Route path="*" element={<OwnerDashboard />} />
+  </Routes>;
+}
+
+function ValuationHistoryRoute() {
+  return <Routes><Route path="/valuation-history/:llcId" element={<ValuationHistoryPage llcId="llc-1" />} /></Routes>;
 }
 
 createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>
+  <StrictMode><BrowserRouter><App /></BrowserRouter></StrictMode>
 );

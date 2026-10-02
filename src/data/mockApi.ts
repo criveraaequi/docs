@@ -10,6 +10,7 @@ import type {
   LLCAuthorizedUser,
   LLC,
   PlatformAdmin,
+  UnitHolderSegment,
   ValuationEvent,
 } from "./types";
 import {
@@ -78,6 +79,47 @@ export function getEmployeeGrants(llcId: string): Employee[] {
   return mockEmployees.filter(
     (emp) => emp.llcId === llcId && emp.grant !== null
   );
+}
+
+/**
+ * Returns the largest unit holders plus one combined remainder segment.
+ * Percentages are based on total authorized units so unissued pool capacity
+ * remains visible as "Other / Unallocated".
+ */
+export function getTopUnitHolders(
+  llcId: string,
+  limit = 3
+): UnitHolderSegment[] {
+  const llc = getLLCDetails(llcId);
+  if (!llc) return [];
+
+  const employees = getEmployeeGrants(llcId)
+    .sort((a, b) => (b.grant?.unitsAwarded ?? 0) - (a.grant?.unitsAwarded ?? 0))
+    .slice(0, limit);
+  const topUnits = employees.reduce(
+    (total, employee) => total + (employee.grant?.unitsAwarded ?? 0),
+    0
+  );
+  const remainderUnits = Math.max(llc.totalUnitsAuthorized - topUnits, 0);
+  const totalUnits = llc.totalUnitsAuthorized;
+
+  const segments: UnitHolderSegment[] = employees.map((employee) => ({
+    label: employee.name,
+    role: employee.roleOrPosition,
+    units: employee.grant?.unitsAwarded ?? 0,
+    percentOfPool: ((employee.grant?.unitsAwarded ?? 0) / totalUnits) * 100,
+  }));
+
+  if (remainderUnits > 0) {
+    segments.push({
+      label: "Other / Unallocated",
+      role: null,
+      units: remainderUnits,
+      percentOfPool: (remainderUnits / totalUnits) * 100,
+    });
+  }
+
+  return segments;
 }
 
 /** Returns a single employee's grant details. */

@@ -32,6 +32,7 @@ export const mockLLCs: LLC[] = [
         valuationAmount: 4_200_000,
         resultingStrikePrice: 84.0,
         analystId: "analyst-1",
+        cpaFirm: "Cho & Associates CPA PLLC",
         documentName: "Summit_HVAC_Valuation_2025-06.pdf",
       },
       {
@@ -39,6 +40,7 @@ export const mockLLCs: LLC[] = [
         valuationAmount: 4_850_000,
         resultingStrikePrice: 97.0,
         analystId: "analyst-1",
+        cpaFirm: "Cho & Associates CPA PLLC",
         documentName: "Summit_HVAC_Valuation_2026-01.pdf",
       },
     ],
@@ -60,6 +62,7 @@ export const mockLLCs: LLC[] = [
         valuationAmount: 7_100_000,
         resultingStrikePrice: 88.75,
         analystId: "analyst-1",
+        cpaFirm: "Cho & Associates CPA PLLC",
         documentName: "Ironclad_Valuation_2025-09.pdf",
       },
     ],

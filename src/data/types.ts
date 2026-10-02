@@ -38,6 +38,7 @@ export interface ValuationEvent {
   valuationAmount: number; // total company valuation in USD
   resultingStrikePrice: number; // per-unit strike price derived from this valuation
   analystId: string; // analyst who performed the valuation
+  cpaFirm: string | null; // CPA firm name, if applicable
   documentName: string; // certified valuation document reference
 }
 
@@ -149,6 +150,17 @@ export interface AnalystLLCEngagement {
   compensationAmount: number | null;
   compensationDate: string | null;
   compensationStatus: "pending" | "paid" | "failed" | null;
+}
+
+// ---------------------------------------------------------------------------
+// Unit Holder Segment (for equity pool chart)
+// ---------------------------------------------------------------------------
+
+export interface UnitHolderSegment {
+  label: string; // employee name or "Other / Unallocated"
+  role: string | null; // employee role, null for unallocated
+  units: number;
+  percentOfPool: number; // share of total issued units
 }
 
 // ---------------------------------------------------------------------------
