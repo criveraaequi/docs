@@ -8,6 +8,15 @@ import type { ValuationEvent } from "@/data/types";
 
 const LLC_ID = "llc-1";
 
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour >= 23 || hour < 3) return "Quite the night owl";
+  if (hour < 5) return "Quite the early bird";
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Wonderful evening";
+}
+
 export function OwnerDashboard() {
   const llc = getLLCDetails(LLC_ID);
   const [selectedValuation, setSelectedValuation] = useState<ValuationEvent | null>(null);
@@ -21,7 +30,7 @@ export function OwnerDashboard() {
   return (
     <AppShell llc={llc} owner={owner}>
       <div className="page-intro">
-        <div><span className="eyebrow">Owner dashboard</span><h1>Good morning, {owner?.name.split(" ")[0] ?? "Owner"}.</h1></div>
+        <div><span className="eyebrow">Owner dashboard</span><h1>{getGreeting()}, {owner?.name.split(" ")[0] ?? "Owner"}.</h1></div>
         <span className="mock-badge">Mock data</span>
       </div>
       <div className="dashboard-grid">
