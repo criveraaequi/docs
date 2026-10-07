@@ -93,6 +93,40 @@
 .vesting-progress-bar { height: 10px; border-radius: 5px; background: #eceae2; overflow: hidden; }
 .vesting-progress-fill { height: 100%; border-radius: 5px; background: var(--navy); transition: width .5s ease; }
 
+.employee-list-card { padding: 24px; }
+.employee-controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+.search-box { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--card-border); border-radius: 4px; color: var(--slate); background: var(--card); flex: 1 1 220px; max-width: 300px; transition: border-color .15s ease; }
+.search-box:focus-within { border-color: var(--navy); }
+.search-box input { border: none; outline: none; background: transparent; font: 13px var(--font-sans); color: var(--navy); width: 100%; }
+.search-box input::placeholder { color: var(--slate); }
+.filter-group { display: flex; gap: 6px; }
+.filter-chip { padding: 7px 12px; border: 1px solid var(--card-border); border-radius: 4px; color: var(--slate); font-size: 12px; font-weight: 500; transition: border-color .15s ease, color .15s ease, background-color .2s ease; }
+.filter-chip:hover { border-color: var(--navy); color: var(--navy); }
+.filter-chip.is-selected { background: var(--navy); border-color: var(--navy); color: var(--card); }
+.sort-select { display: flex; align-items: center; gap: 8px; color: var(--slate); font-size: 12px; }
+.sort-select select { padding: 7px 10px; border: 1px solid var(--card-border); border-radius: 4px; background: var(--card); color: var(--navy); font: 12px var(--font-sans); cursor: pointer; }
+.employee-table-header, .employee-row { display: grid; grid-template-columns: 1.6fr .9fr .7fr .7fr 1fr .9fr; gap: 16px; align-items: center; text-align: left; }
+.employee-table-header { padding: 12px 0 8px; color: var(--slate); font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; border-top: 1px solid var(--card-border); }
+.employee-row { padding: 15px 0; border-top: 1px solid rgba(138, 147, 163, .16); }
+.employee-row strong { font-weight: 500; font-size: 13px; color: var(--navy); font-variant-numeric: tabular-nums; }
+.employee-name-cell { display: grid; gap: 2px; }
+.employee-link { color: var(--navy); font-weight: 500; font-size: 13px; transition: color .15s ease; }
+.employee-link:hover { color: var(--green); text-decoration: underline; text-underline-offset: 3px; }
+.employee-name-cell span { color: var(--slate); font-size: 12px; }
+.status-label { justify-self: start; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
+.status-active { background: rgba(45, 106, 79, .12); color: var(--green); }
+.status-former { background: rgba(138, 147, 163, .14); color: var(--slate); }
+.contract-link { display: inline-flex; align-items: center; gap: 5px; color: var(--green); font-size: 12px; font-weight: 500; transition: color .15s ease; }
+.contract-link:hover { color: var(--navy); text-decoration: underline; text-underline-offset: 3px; }
+.no-contract { color: var(--slate); font-size: 12px; }
+.former-toggle { display: flex; align-items: center; gap: 7px; margin-top: 14px; padding: 10px 0 2px; border-top: 1px solid var(--card-border); color: var(--slate); font-size: 12px; font-weight: 500; transition: color .15s ease; }
+.former-toggle:hover { color: var(--navy); }
+.former-toggle .chevron-open { transform: rotate(180deg); }
+.contract-notice { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 16px; padding: 14px 18px; border: 1px solid rgba(184, 118, 62, .38); border-radius: 5px; background: rgba(184, 118, 62, .07); color: var(--navy); font-size: 13px; }
+.contract-notice button { color: var(--slate); font-size: 12px; font-weight: 500; }
+.contract-notice button:hover { color: var(--navy); }
+.stat-card-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+
 .payout-hero { display: grid; gap: 18px; padding: 28px 28px 24px; }
 .payout-hero-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; }
 .payout-employee { font: 600 26px/1.2 var(--font-serif); letter-spacing: -.01em; color: var(--navy); }
@@ -112,11 +146,21 @@
 
 @media (max-width: 1100px) {
   .vesting-stats { grid-template-columns: repeat(3, 1fr); }
-  .vesting-grid { grid-template-columns: 1fr; }
+  .stat-card-row { grid-template-columns: repeat(3, 1fr); }
+  .employee-table-header, .employee-row { grid-template-columns: 1.4fr 1fr .8fr 1fr; }
+  .employee-table-header span:nth-child(2), .employee-row .status-label { display: none; }
+  .employee-table-header span:nth-child(n+5), .employee-row > *:nth-child(n+5) { display: none; }
   .payout-stat-row { grid-template-columns: repeat(3, 1fr); row-gap: 18px; }
 }
 @media (max-width: 800px) {
   .vesting-stats { grid-template-columns: repeat(2, 1fr); }
+  .stat-card-row { grid-template-columns: 1fr; }
+  .employee-controls { flex-direction: column; align-items: stretch; }
+  .search-box { max-width: none; }
+  .employee-table-header, .employee-row { grid-template-columns: 1.4fr 1fr; }
+  .employee-table-header span:nth-child(n+3), .employee-row > *:nth-child(n+3) { display: none; }
+  .employee-table-header span:nth-child(2), .employee-row .status-label { display: block; }
+  .employee-row .status-label { justify-self: start; }
   .payout-headline strong { font-size: 32px; }
   .payout-hero-header { flex-direction: column; }
   .payout-stat-row { grid-template-columns: repeat(2, 1fr); }
@@ -156,6 +200,11 @@
   .pool-visual { gap: 14px; }
   .history-table-header, .history-row { grid-template-columns: 1fr 1fr; }
   .history-table-header span:nth-child(n+3), .history-row span:nth-child(n+3) { display: none; }
+  .employee-table-header, .employee-row { grid-template-columns: 1fr; gap: 6px; }
+  .employee-table-header { display: none; }
+  .employee-row { padding: 16px 0; }
+  .employee-row > *:not(.employee-name-cell) { display: block; }
+  .employee-row .status-label { justify-self: start; }
   .modal-grid { grid-template-columns: 1fr; }
   .modal-field:nth-child(even) { padding-left: 0; border-left: none; }
   .modal-field:nth-child(odd) { padding-right: 0; }
