@@ -193,7 +193,7 @@ export function EmployeeDetailPage() {
                 />
                 <Tooltip
                   cursor={{ stroke: "rgba(138, 147, 163, .35)" }}
-                  contentStyle={{ border: "1px solid rgba(138, 147, 163, .25)", borderRadius: 5, background: "#fdfcf9", fontFamily: "IBM Plex Sans" }}
+                  contentStyle={{ border: "1px solid rgba(138, 147, 163, .25)", borderRadius: 5, background: "#fdfcf9", fontFamily: "Work Sans" }}
                   formatter={(value: unknown) =>
                     showValue
                       ? [currency.format(Number(value)), "Vested value"]

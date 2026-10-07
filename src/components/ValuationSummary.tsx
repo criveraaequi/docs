@@ -45,7 +45,7 @@ export function ValuationSummary({ llc, analyst, onSelectValuation }: ValuationS
             <YAxis hide domain={["dataMin - 300000", "dataMax + 300000"]} />
             <Tooltip
               cursor={{ stroke: "rgba(138, 147, 163, .35)" }}
-              contentStyle={{ border: "1px solid rgba(138, 147, 163, .25)", borderRadius: 5, background: "#fdfcf9", fontFamily: "IBM Plex Sans" }}
+              contentStyle={{ border: "1px solid rgba(138, 147, 163, .25)", borderRadius: 5, background: "#fdfcf9", fontFamily: "Work Sans" }}
               formatter={(value: unknown) => [currency.format(Number(value) || 0), "Certified value"]}
             />
             <Line type="monotone" dataKey="valuationAmount" stroke="#1f3164" strokeWidth={2} dot={{ r: 5, fill: "#fdfcf9", stroke: "#1f3164", strokeWidth: 2, cursor: "pointer" }} activeDot={{ r: 7, fill: "#1f3164", stroke: "#fdfcf9", strokeWidth: 2, cursor: "pointer" }} />
