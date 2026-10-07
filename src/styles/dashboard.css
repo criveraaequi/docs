@@ -91,7 +91,7 @@
 .payout-hero { display: grid; gap: 18px; padding: 28px 28px 24px; }
 .payout-hero-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; }
 .payout-employee { font: 600 26px/1.2 var(--font-serif); letter-spacing: -.01em; color: var(--navy); }
-.payout-company { color: var(--slate); font-weight: 500; }
+.payout-company { font-family: var(--font-sans); color: var(--slate); font-weight: 500; }
 .payout-units { display: inline-block; margin-top: 7px; color: var(--slate); font-size: 12px; text-transform: uppercase; letter-spacing: .07em; }
 .payout-headline { display: flex; align-items: baseline; gap: 14px; }
 .payout-headline strong { font: 600 42px/1.05 var(--font-serif); letter-spacing: -.02em; color: var(--navy); font-variant-numeric: tabular-nums; }
