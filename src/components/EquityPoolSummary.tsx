@@ -1,5 +1,5 @@
 import { ArrowUpRight } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import type { LLC, UnitHolderSegment } from "@/data/types";
 
@@ -11,6 +11,16 @@ interface EquityPoolSummaryProps {
 const segmentColors = ["#1f3164", "#4a7c59", "#8a93a3"];
 
 type BarScale = "company" | "pool";
+
+interface Segment {
+  label: string;
+  role: string | null;
+  units: number;
+  percentOfPool: number;
+  color: string;
+}
+
+const EXIT_MS = 300;
 
 export function EquityPoolSummary({ llc, holders }: EquityPoolSummaryProps) {
   const [scale, setScale] = useState<BarScale>("company");
@@ -30,17 +40,75 @@ export function EquityPoolSummary({ llc, holders }: EquityPoolSummaryProps) {
     ? Math.max(authorized - allocatedUnits, 0)
     : Math.max(poolUnits - allocatedUnits, 0);
 
-  const segments = scale === "company"
+  const currentSegments: Segment[] = scale === "company"
     ? [
-        { label: "pool", role: null, units: poolUnits, percentOfPool: 0 },
-        { label: "remainder", role: null, units: tailUnits, percentOfPool: 0 },
+        { label: "pool", role: null, units: poolUnits, percentOfPool: 0, color: segmentColors[0] },
+        { label: "remainder", role: null, units: tailUnits, percentOfPool: 0, color: "#d9d7ce" },
       ]
     : [
-      ...roleHolders,
+      ...roleHolders.map((holder, index) => ({
+        ...holder,
+        color: segmentColors[index % segmentColors.length],
+      })),
       ...(tailUnits > 0
-        ? [{ label: "remainder", role: null, units: tailUnits, percentOfPool: 0 }]
+        ? [{ label: "remainder", role: null, units: tailUnits, percentOfPool: 0, color: "#eceae2" }]
         : []),
     ];
+
+  // Hold segments that are leaving the bar mounted briefly so they fade out
+  // instead of vanishing in a single frame.
+  const [renderedSegments, setRenderedSegments] = useState<Segment[]>(currentSegments);
+  const exitingKeys = useRef<Set<string>>(new Set());
+  const exitTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    const rendered = new Map(renderedSegments.map((segment) => [segment.label, segment]));
+    const nextKeys = new Set(currentSegments.map((segment) => segment.label));
+    const stillExiting = [...exitingKeys.current].filter((key) => !nextKeys.has(key));
+    const merged = currentSegments.map((segment) => {
+      const previous = rendered.get(segment.label);
+      return previous ? { ...segment, color: previous.color } : segment;
+    });
+    for (const key of stillExiting) {
+      const previous = rendered.get(key);
+      if (previous) merged.push(previous);
+    }
+    setRenderedSegments(merged);
+    exitingKeys.current = new Set(stillExiting);
+
+    if (exitTimer.current !== null) window.clearTimeout(exitTimer.current);
+    if (stillExiting.length > 0) {
+      exitTimer.current = window.setTimeout(() => {
+        exitingKeys.current = new Set();
+        setRenderedSegments((segments) => segments.filter((segment) => !exitingKeys.current.has(segment.label) && nextKeys.has(segment.label)));
+      }, EXIT_MS);
+    }
+    return () => {
+      if (exitTimer.current !== null) {
+        window.clearTimeout(exitTimer.current);
+        exitTimer.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scale]);
+
+  const [noteText, setNoteText] = useState(
+    `Bar is the full ${authorized.toLocaleString()}-unit company.`
+  );
+  const [noteVisible, setNoteVisible] = useState(true);
+  useEffect(() => {
+    setNoteVisible(false);
+    const timer = window.setTimeout(() => {
+      setNoteText(
+        scale === "company"
+          ? `Bar is the full ${authorized.toLocaleString()}-unit company.`
+          : `Bar is the ${llc.equityPoolPercent}% equity pool (${poolUnits.toLocaleString()} units) — holders shown as shares of the pool.`
+      );
+      setNoteVisible(true);
+    }, 200);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scale]);
 
   return (
     <section className="card summary-card">
@@ -74,24 +142,22 @@ export function EquityPoolSummary({ llc, holders }: EquityPoolSummaryProps) {
               .map((holder) => `${holder.label} ${holder.percentOfPool.toFixed(1)}%`)
               .join(", ")}`}
         >
-          {segments.map((segment, index) => {
+          {renderedSegments.map((segment) => {
+            const isExiting = exitingKeys.current.has(segment.label);
             const isTail = segment.label === "remainder";
             const isPoolBlock = segment.label === "pool";
-            const color = isTail
-              ? scale === "company" ? "#d9d7ce" : "#eceae2"
-              : isPoolBlock ? segmentColors[0] : segmentColors[index % segmentColors.length];
             return (
               <div
                 className={isPoolBlock && scale === "company"
                   ? "pool-bar-segment pool-bar-segment-clickable"
-                  : "pool-bar-segment"}
+                  : `pool-bar-segment${isExiting ? " is-exiting" : ""}`}
                 key={segment.label}
                 onClick={isPoolBlock && scale === "company"
                   ? () => setScale("pool")
                   : undefined}
                 style={{
                   width: `${(segment.units / denominator) * 100}%`,
-                  backgroundColor: color,
+                  backgroundColor: segment.color,
                 }}
                 title={
                   isTail
@@ -106,11 +172,7 @@ export function EquityPoolSummary({ llc, holders }: EquityPoolSummaryProps) {
             );
           })}
         </div>
-        <p className="pool-scale-note">
-          {scale === "company"
-            ? `Bar is the full ${authorized.toLocaleString()}-unit company.`
-            : `Bar is the ${llc.equityPoolPercent}% equity pool (${poolUnits.toLocaleString()} units) — holders shown as shares of the pool.`}
-        </p>
+        <p className={`pool-scale-note${noteVisible ? "" : " is-switching"}`}>{noteText}</p>
         <div className="pool-legend" aria-label="Top unit holders">
           {roleHolders.map((holder, index) => (
             <div className="legend-item" key={holder.label}>
