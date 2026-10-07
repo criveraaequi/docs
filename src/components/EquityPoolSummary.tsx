@@ -82,8 +82,13 @@ export function EquityPoolSummary({ llc, holders }: EquityPoolSummaryProps) {
               : isPoolBlock ? segmentColors[0] : segmentColors[index % segmentColors.length];
             return (
               <div
-                className="pool-bar-segment"
+                className={isPoolBlock && scale === "company"
+                  ? "pool-bar-segment pool-bar-segment-clickable"
+                  : "pool-bar-segment"}
                 key={segment.label}
+                onClick={isPoolBlock && scale === "company"
+                  ? () => setScale("pool")
+                  : undefined}
                 style={{
                   width: `${(segment.units / denominator) * 100}%`,
                   backgroundColor: color,
@@ -94,7 +99,7 @@ export function EquityPoolSummary({ llc, holders }: EquityPoolSummaryProps) {
                       ? `Not in pool — ${(segment.units / authorized * 100).toFixed(1)}% of company (${segment.units.toLocaleString()} units)`
                       : `Unallocated pool — ${(segment.units / poolUnits * 100).toFixed(1)}% of pool (${segment.units.toLocaleString()} units)`
                     : isPoolBlock
-                      ? `Equity pool — ${(segment.units / authorized * 100).toFixed(1)}% of company (${segment.units.toLocaleString()} units)`
+                      ? `Equity pool — ${(segment.units / authorized * 100).toFixed(1)}% of company (${segment.units.toLocaleString()} units) — click to view breakdown`
                       : `${segment.label} — ${segment.percentOfPool.toFixed(1)}% (${segment.units.toLocaleString()} units)`
                 }
               />
