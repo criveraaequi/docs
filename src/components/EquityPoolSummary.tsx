@@ -8,8 +8,7 @@ interface EquityPoolSummaryProps {
   holders: UnitHolderSegment[];
 }
 
-const segmentColors = ["#1f3164", "#4a7c59", "#8a93a3", "#d9d7ce"];
-const poolRemainderColor = "#eceae2";
+const segmentColors = ["#1f3164", "#4a7c59", "#8a93a3"];
 
 type BarScale = "company" | "pool";
 
@@ -21,21 +20,27 @@ export function EquityPoolSummary({ llc, holders }: EquityPoolSummaryProps) {
   const roleHolders = holders.filter((holder) => holder.role !== null);
   const allocatedUnits = roleHolders.reduce((sum, holder) => sum + holder.units, 0);
 
-  // Company view: each segment is units/authorized and the tail is the rest of
-  // the company. Pool view: the bar is the 10% pool, so each segment is
-  // units/poolUnits and the tail is unallocated pool capacity. The tail keeps
-  // one stable key so it morphs rather than remounts when toggling.
+  // Company view: one solid navy block for the whole pool, then the rest of
+  // the company — no per-holder separations at this zoom. Pool view: the bar
+  // is the 10% pool, so each segment is units/poolUnits and the tail is
+  // unallocated pool capacity. The tail keeps one stable key so it morphs
+  // rather than remounts when toggling.
   const denominator = scale === "company" ? authorized : poolUnits;
   const tailUnits = scale === "company"
     ? Math.max(authorized - allocatedUnits, 0)
     : Math.max(poolUnits - allocatedUnits, 0);
 
-  const segments = [
-    ...roleHolders,
-    ...(tailUnits > 0
-      ? [{ label: "remainder", role: null, units: tailUnits, percentOfPool: 0 }]
-      : []),
-  ];
+  const segments = scale === "company"
+    ? [
+        { label: "pool", role: null, units: poolUnits, percentOfPool: 0 },
+        { label: "remainder", role: null, units: tailUnits, percentOfPool: 0 },
+      ]
+    : [
+      ...roleHolders,
+      ...(tailUnits > 0
+        ? [{ label: "remainder", role: null, units: tailUnits, percentOfPool: 0 }]
+        : []),
+    ];
 
   return (
     <section className="card summary-card">
@@ -63,15 +68,18 @@ export function EquityPoolSummary({ llc, holders }: EquityPoolSummaryProps) {
         <div
           className="pool-bar"
           role="img"
-          aria-label={`Pool allocation (${scale === "company" ? "share of company" : "share of equity pool"}): ${roleHolders
-            .map((holder) => `${holder.label} ${holder.percentOfPool.toFixed(1)}%`)
-            .join(", ")}`}
+          aria-label={scale === "company"
+            ? `Pool allocation (share of company): equity pool ${(poolUnits / authorized * 100).toFixed(1)}%`
+            : `Pool allocation (share of equity pool): ${roleHolders
+              .map((holder) => `${holder.label} ${holder.percentOfPool.toFixed(1)}%`)
+              .join(", ")}`}
         >
           {segments.map((segment, index) => {
             const isTail = segment.label === "remainder";
+            const isPoolBlock = segment.label === "pool";
             const color = isTail
-              ? scale === "company" ? "#d9d7ce" : poolRemainderColor
-              : segmentColors[index % segmentColors.length];
+              ? scale === "company" ? "#d9d7ce" : "#eceae2"
+              : isPoolBlock ? segmentColors[0] : segmentColors[index % segmentColors.length];
             return (
               <div
                 className="pool-bar-segment"
@@ -85,7 +93,9 @@ export function EquityPoolSummary({ llc, holders }: EquityPoolSummaryProps) {
                     ? scale === "company"
                       ? `Not in pool — ${(segment.units / authorized * 100).toFixed(1)}% of company (${segment.units.toLocaleString()} units)`
                       : `Unallocated pool — ${(segment.units / poolUnits * 100).toFixed(1)}% of pool (${segment.units.toLocaleString()} units)`
-                    : `${segment.label} — ${segment.percentOfPool.toFixed(1)}% (${segment.units.toLocaleString()} units)`
+                    : isPoolBlock
+                      ? `Equity pool — ${(segment.units / authorized * 100).toFixed(1)}% of company (${segment.units.toLocaleString()} units)`
+                      : `${segment.label} — ${segment.percentOfPool.toFixed(1)}% (${segment.units.toLocaleString()} units)`
                 }
               />
             );
