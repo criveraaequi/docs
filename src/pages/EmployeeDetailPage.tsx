@@ -1,5 +1,5 @@
 import { ArrowLeft, ArrowUpRight } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   Area,
@@ -10,7 +10,6 @@ import {
   Tooltip,
   XAxis,
   YAxis,
-  ReferenceDot,
 } from "recharts";
 import { AppShell } from "@/components/AppShell";
 import { formatDate } from "@/components/ValuationDetailModal";
@@ -21,9 +20,11 @@ const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "
 
 interface VestingPoint {
   label: string;
+  dateIso: string;
   vestedUnits: number;
   vestedValue: number;
   isCliff: boolean;
+  isToday: boolean;
 }
 
 function monthsBetween(fromIso: string, toIso: string): number {
@@ -60,9 +61,11 @@ function buildVestingSeries(grant: EquityGrant, valuationHistory: ValuationEvent
         : Math.min(Math.round((month - cliffMonths) * monthlyAfterCliff), unitsAwarded);
     points.push({
       label: date.toLocaleDateString("en-US", { month: "short", year: "2-digit" }),
+      dateIso: iso,
       vestedUnits,
       vestedValue: Math.round(vestedUnits * priceAt(valuationHistory, iso)),
       isCliff: month === cliffMonths,
+      isToday: false,
     });
   }
   return points;
@@ -152,28 +155,27 @@ export function EmployeeDetailPage() {
   const completionTime = new Date(grant.vesting.vestingCompletionDate).getTime();
   const showTodayMarker = todayTime >= grantStartTime && todayTime <= completionTime;
 
-  let todayPoint: VestingPoint | null = null;
-  let displaySeries = series;
-  if (showTodayMarker && series.length > 0) {
+  const displaySeries = useMemo(() => {
+    if (!showTodayMarker || series.length === 0) return series;
     const cliffTime = new Date(grant.vesting.cliffDate).getTime();
     const fraction = todayTime <= cliffTime
       ? 0
       : Math.min((todayTime - cliffTime) / (completionTime - cliffTime), 1);
     const vestedUnits = Math.round(grant.unitsAwarded * fraction);
-    todayPoint = {
-      label: "Today",
+    const todayPoint: VestingPoint = {
+      label: new Date(todayIso).toLocaleDateString("en-US", { month: "short", year: "2-digit" }),
+      dateIso: todayIso,
       vestedUnits,
       vestedValue: Math.round(vestedUnits * priceAt(history, todayIso)),
       isCliff: false,
+      isToday: true,
     };
-    const insertIndex = series.findIndex((point) => {
-      const pointMonth = new Date(point.label === "Today" ? todayIso : `01 ${point.label}`);
-      return pointMonth.getTime() > todayTime;
-    });
-    displaySeries = [...series];
-    if (insertIndex === -1) displaySeries.push(todayPoint);
-    else displaySeries.splice(insertIndex, 0, todayPoint);
-  }
+    const insertIndex = series.findIndex((point) => new Date(point.dateIso).getTime() > todayTime);
+    const next = [...series];
+    if (insertIndex === -1) next.push(todayPoint);
+    else next.splice(insertIndex, 0, todayPoint);
+    return next;
+  }, [series, showTodayMarker, todayTime, todayIso, grant, history, completionTime]);
 
   return (
     <AppShell llc={llc} owner={owner}>
@@ -239,36 +241,27 @@ export function EmployeeDetailPage() {
                     label={{ value: "CLIFF · YR 1", position: "top", fill: "#b07d3a", fontSize: 10, letterSpacing: "0.08em" }}
                   />
                 )}
-                {todayPoint && (
-                  <ReferenceDot
-                    x="Today"
-                    y={showValue ? todayPoint.vestedValue : todayPoint.vestedUnits}
-                    r={11}
-                    fill="#b07d3a"
-                    className="today-marker-pulse"
-                    ifOverflow="extendDomain"
-                  />
-                )}
-                {todayPoint && (
-                  <ReferenceDot
-                    x="Today"
-                    y={showValue ? todayPoint.vestedValue : todayPoint.vestedUnits}
-                    r={4.5}
-                    fill="#b07d3a"
-                    stroke="#fdfcf9"
-                    strokeWidth={2}
-                    label={{ value: "TODAY", position: "top", fill: "#b07d3a", fontSize: 10, letterSpacing: "0.08em" }}
-                    ifOverflow="extendDomain"
-                  />
-                )}
                 <Area
                   type="monotone"
                   dataKey={dataKey}
                   stroke="#1f3164"
                   strokeWidth={2.5}
                   fill="rgba(31, 49, 100, .1)"
-                  dot={{ r: 3, fill: "#1f3164", strokeWidth: 0 }}
                   activeDot={{ r: 5, fill: "#1f3164", stroke: "#fdfcf9", strokeWidth: 2 }}
+                  dot={(props: unknown) => {
+                    const { cx, cy, payload, key } = props as { cx?: number; cy?: number; payload?: VestingPoint; key?: string };
+                    if (cx === undefined || cy === undefined || !payload) return <g key={key} />;
+                    if (payload.isToday) {
+                      return (
+                        <g key={key}>
+                          <circle cx={cx} cy={cy} r={11} fill="#b07d3a" className="today-marker-pulse" />
+                          <circle cx={cx} cy={cy} r={4.5} fill="#b07d3a" stroke="#fdfcf9" strokeWidth={2} />
+                          <text x={cx} y={cy - 18} textAnchor="middle" fill="#b07d3a" fontSize={10} letterSpacing="0.08em">TODAY</text>
+                        </g>
+                      );
+                    }
+                    return <circle key={key} cx={cx} cy={cy} r={3} fill="#1f3164" />;
+                  }}
                 />
               </AreaChart>
             </ResponsiveContainer>
