@@ -139,7 +139,7 @@
 .payout-projected strong { color: var(--navy); font-weight: 600; }
 .payout-chart-card { display: grid; gap: 8px; }
 .payout-chart { height: 300px; }
-.today-marker-pulse { animation: today-pulse 1.6s ease-in-out infinite; transform-origin: center; }
+.today-marker-pulse { animation: today-pulse 1.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
 @keyframes today-pulse {
   0%, 100% { opacity: .55; transform: scale(1); }
   50% { opacity: .12; transform: scale(1.28); }
