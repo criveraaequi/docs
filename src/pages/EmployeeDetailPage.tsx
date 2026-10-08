@@ -10,6 +10,7 @@ import {
   Tooltip,
   XAxis,
   YAxis,
+  ReferenceDot,
 } from "recharts";
 import { AppShell } from "@/components/AppShell";
 import { formatDate } from "@/components/ValuationDetailModal";
@@ -145,6 +146,35 @@ export function EmployeeDetailPage() {
       : value.toLocaleString();
   const cliffPoint = series.find((point) => point.isCliff);
 
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayTime = new Date(todayIso).getTime();
+  const grantStartTime = new Date(grant.vesting.grantDate).getTime();
+  const completionTime = new Date(grant.vesting.vestingCompletionDate).getTime();
+  const showTodayMarker = todayTime >= grantStartTime && todayTime <= completionTime;
+
+  let todayPoint: VestingPoint | null = null;
+  let displaySeries = series;
+  if (showTodayMarker && series.length > 0) {
+    const cliffTime = new Date(grant.vesting.cliffDate).getTime();
+    const fraction = todayTime <= cliffTime
+      ? 0
+      : Math.min((todayTime - cliffTime) / (completionTime - cliffTime), 1);
+    const vestedUnits = Math.round(grant.unitsAwarded * fraction);
+    todayPoint = {
+      label: "Today",
+      vestedUnits,
+      vestedValue: Math.round(vestedUnits * priceAt(history, todayIso)),
+      isCliff: false,
+    };
+    const insertIndex = series.findIndex((point) => {
+      const pointMonth = new Date(point.label === "Today" ? todayIso : `01 ${point.label}`);
+      return pointMonth.getTime() > todayTime;
+    });
+    displaySeries = [...series];
+    if (insertIndex === -1) displaySeries.push(todayPoint);
+    else displaySeries.splice(insertIndex, 0, todayPoint);
+  }
+
   return (
     <AppShell llc={llc} owner={owner}>
       <div className="history-page employee-page">
@@ -180,7 +210,7 @@ export function EmployeeDetailPage() {
         <section className="card payout-chart-card">
           <div className="chart-wrap payout-chart">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={series} margin={{ top: 24, right: 16, left: 4, bottom: 4 }}>
+              <AreaChart data={displaySeries} margin={{ top: 24, right: 16, left: 4, bottom: 4 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(138, 147, 163, .18)" vertical={false} />
                 <XAxis dataKey="label" tick={{ fill: "#8a93a3", fontSize: 11 }} tickLine={false} axisLine={false} minTickGap={28} />
                 <YAxis
@@ -188,7 +218,7 @@ export function EmployeeDetailPage() {
                   tickLine={false}
                   axisLine={false}
                   width={58}
-                  domain={[0, showValue ? Math.max(...series.map((p) => p.vestedValue)) : grant.unitsAwarded]}
+                  domain={[0, showValue ? Math.max(...displaySeries.map((p) => p.vestedValue)) : grant.unitsAwarded]}
                   tickFormatter={formatTick}
                 />
                 <Tooltip
@@ -207,6 +237,28 @@ export function EmployeeDetailPage() {
                     stroke="#b07d3a"
                     strokeDasharray="5 4"
                     label={{ value: "CLIFF · YR 1", position: "top", fill: "#b07d3a", fontSize: 10, letterSpacing: "0.08em" }}
+                  />
+                )}
+                {todayPoint && (
+                  <ReferenceDot
+                    x="Today"
+                    y={showValue ? todayPoint.vestedValue : todayPoint.vestedUnits}
+                    r={11}
+                    fill="#b07d3a"
+                    className="today-marker-pulse"
+                    ifOverflow="extendDomain"
+                  />
+                )}
+                {todayPoint && (
+                  <ReferenceDot
+                    x="Today"
+                    y={showValue ? todayPoint.vestedValue : todayPoint.vestedUnits}
+                    r={4.5}
+                    fill="#b07d3a"
+                    stroke="#fdfcf9"
+                    strokeWidth={2}
+                    label={{ value: "TODAY", position: "top", fill: "#b07d3a", fontSize: 10, letterSpacing: "0.08em" }}
+                    ifOverflow="extendDomain"
                   />
                 )}
                 <Area

@@ -139,6 +139,11 @@
 .payout-projected strong { color: var(--navy); font-weight: 600; }
 .payout-chart-card { display: grid; gap: 8px; }
 .payout-chart { height: 300px; }
+.today-marker-pulse { animation: today-pulse 1.6s ease-in-out infinite; transform-origin: center; }
+@keyframes today-pulse {
+  0%, 100% { opacity: .55; transform: scale(1); }
+  50% { opacity: .12; transform: scale(1.28); }
+}
 .payout-stat-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; padding: 14px 24px 20px; border-top: 1px solid var(--card-border); }
 .payout-stat { display: grid; gap: 4px; }
 .payout-stat span { color: var(--slate); font-size: 11px; text-transform: uppercase; letter-spacing: .07em; }
