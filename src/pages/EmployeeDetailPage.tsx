@@ -253,7 +253,8 @@ export function EmployeeDetailPage() {
                     if (cx === undefined || cy === undefined || !payload) return <g key={key} />;
                     if (payload.isToday) {
                       return (
-                        <g key={key}>
+                        <g key={key} className="today-marker" tabIndex={0}>
+                          <circle cx={cx} cy={cy} r={14} fill="transparent" />
                           <circle cx={cx} cy={cy} r={11} fill="#b07d3a" className="today-marker-pulse" />
                           <circle cx={cx} cy={cy} r={4.5} fill="#b07d3a" stroke="#fdfcf9" strokeWidth={2} />
                           <text x={cx} y={cy - 18} textAnchor="middle" fill="#b07d3a" fontSize={10} letterSpacing="0.08em">TODAY</text>
