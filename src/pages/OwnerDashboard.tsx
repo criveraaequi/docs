@@ -25,7 +25,7 @@ export function OwnerDashboard() {
 
   const analyst = getAnalystForLLC(llc.id);
   const owner = getAuthorizedUser(llc.id);
-  const holders = getTopUnitHolders(llc.id, 3);
+  const holders = getTopUnitHolders(llc.id, 25);
 
   return (
     <AppShell llc={llc} owner={owner}>

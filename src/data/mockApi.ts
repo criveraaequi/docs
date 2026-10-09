@@ -88,9 +88,10 @@ export function getEmployeeGrants(llcId: string): Employee[] {
 }
 
 /**
- * Returns the largest unit holders plus one combined remainder segment.
- * Percentages are based on total authorized units so unissued pool capacity
- * remains visible as "Other / Unallocated".
+ * Returns all unit holders plus one combined remainder segment.
+ * Percentages are shares of the LLC's phantom equity pool, so each holder's
+ * segment width in the pool bar matches its listed percentage. Unissued pool
+ * capacity remains visible as "Other / Unallocated".
  */
 export function getTopUnitHolders(
   llcId: string,
@@ -99,6 +100,7 @@ export function getTopUnitHolders(
   const llc = getLLCDetails(llcId);
   if (!llc) return [];
 
+  const poolUnits = (llc.equityPoolPercent / 100) * llc.totalUnitsAuthorized;
   const employees = getEmployeeGrants(llcId)
     .sort((a, b) => (b.grant?.unitsAwarded ?? 0) - (a.grant?.unitsAwarded ?? 0))
     .slice(0, limit);
@@ -106,15 +108,14 @@ export function getTopUnitHolders(
     (total, employee) => total + (employee.grant?.unitsAwarded ?? 0),
     0
   );
-  const remainderUnits = Math.max(llc.totalUnitsAuthorized - topUnits, 0);
-  const totalUnits = llc.totalUnitsAuthorized;
+  const remainderUnits = Math.max(poolUnits - topUnits, 0);
 
   const segments: UnitHolderSegment[] = employees.map((employee) => ({
     label: employee.name,
     employeeId: employee.id,
     role: employee.roleOrPosition,
     units: employee.grant?.unitsAwarded ?? 0,
-    percentOfPool: ((employee.grant?.unitsAwarded ?? 0) / totalUnits) * 100,
+    percentOfPool: ((employee.grant?.unitsAwarded ?? 0) / poolUnits) * 100,
   }));
 
   if (remainderUnits > 0) {
@@ -122,7 +123,7 @@ export function getTopUnitHolders(
       label: "Other / Unallocated",
       role: null,
       units: remainderUnits,
-      percentOfPool: (remainderUnits / totalUnits) * 100,
+      percentOfPool: (remainderUnits / poolUnits) * 100,
     });
   }
 

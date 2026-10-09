@@ -161,7 +161,7 @@ export interface UnitHolderSegment {
   employeeId?: string; // set for real employees so screens can link to their pages
   role: string | null; // employee role, null for unallocated
   units: number;
-  percentOfPool: number; // share of total issued units
+  percentOfPool: number; // share of the LLC's phantom equity pool (pool view)
 }
 
 // ---------------------------------------------------------------------------
