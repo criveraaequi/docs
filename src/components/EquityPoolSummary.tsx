@@ -1,6 +1,6 @@
 import { ArrowUpRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import type { LLC, UnitHolderSegment } from "@/data/types";
 
 interface EquityPoolSummaryProps {
@@ -33,6 +33,7 @@ interface Segment {
   units: number;
   percentOfPool: number;
   color: string;
+  employeeId?: string;
 }
 
 const EXIT_MS = 300;
@@ -40,6 +41,13 @@ const EXIT_MS = 300;
 export function EquityPoolSummary({ llc, holders }: EquityPoolSummaryProps) {
   const [scale, setScale] = useState<BarScale>("company");
   const [consolidated, setConsolidated] = useState(false);
+  const navigate = useNavigate();
+
+  // Hover infobox state. Anchored to the hovered segment, not the cursor,
+  // so it stays stable while the pointer moves within one segment.
+  const [hoveredLabel, setHoveredLabel] = useState<string | null>(null);
+  const [hoverInfo, setHoverInfo] = useState<{ title: string; detail: string; segmentLabel: string } | null>(null);
+  const hideTimer = useRef<number | null>(null);
 
   const authorized = llc.totalUnitsAuthorized;
   const poolUnits = (llc.equityPoolPercent / 100) * authorized;
@@ -147,6 +155,37 @@ export function EquityPoolSummary({ llc, holders }: EquityPoolSummaryProps) {
     ? [...visibleHolders, { label: "Others", percentOfPool: othersPercent }]
     : roleHolders;
 
+  const clearHideTimer = () => {
+    if (hideTimer.current !== null) {
+      window.clearTimeout(hideTimer.current);
+      hideTimer.current = null;
+    }
+  };
+
+  const showSegmentInfo = (title: string, detail: string, segmentLabel: string) => {
+    clearHideTimer();
+    setHoveredLabel(segmentLabel);
+    setHoverInfo({ title, detail, segmentLabel });
+  };
+
+  const scheduleSegmentHide = () => {
+    clearHideTimer();
+    hideTimer.current = window.setTimeout(() => {
+      setHoveredLabel(null);
+      setHoverInfo(null);
+    }, 120);
+  };
+
+  const routeSegment = (segment: Segment) => {
+    if (scale !== "pool") return;
+    if (segment.label === "remainder" || segment.label === "pool") return;
+    if (segment.label === "Others" && consolidated) {
+      navigate("/employees");
+      return;
+    }
+    if (segment.employeeId) navigate(`/employees/${segment.employeeId}`);
+  };
+
   return (
     <section className="card summary-card">
       <div className="card-heading">
@@ -170,44 +209,70 @@ export function EquityPoolSummary({ llc, holders }: EquityPoolSummaryProps) {
             issued units of {authorized.toLocaleString()} authorized
           </span>
         </div>
-        <div
-          className="pool-bar"
-          role="img"
-          aria-label={scale === "company"
+        <div className="pool-bar-wrap">
+          {hoverInfo && (
+            <div className="segment-infobox" role="status">
+              <strong>{hoverInfo.title}</strong>
+              <span>{hoverInfo.detail}</span>
+            </div>
+          )}
+          <div
+            className="pool-bar"
+            role="img"
+            aria-label={scale === "company"
             ? `Pool allocation (share of company): equity pool ${(poolUnits / authorized * 100).toFixed(1)}%`
             : `Pool allocation (share of equity pool): ${barAriaHolders
               .map((holder) => `${holder.label} ${displayPercent(holder.percentOfPool).toFixed(1)}%`)
               .join(", ")}`}
-        >
+          >
           {renderedSegments.map((segment) => {
             const isExiting = exitingKeys.current.has(segment.label);
             const isTail = segment.label === "remainder";
             const isPoolBlock = segment.label === "pool";
+            const isHovered = hoveredLabel === segment.label;
+            const isOther = consolidated && segment.label === "Others";
+            const routable = scale === "pool" && !isTail && !isPoolBlock && (isOther || segment.employeeId);
+            const infoTitle = isOther
+              ? "Others"
+              : isPoolBlock || isTail
+                ? null
+                : segment.label;
+            const infoDetail = isOther
+              ? `${displayPercent(segment.percentOfPool).toFixed(1)}% of pool · ${segment.units.toLocaleString()} units`
+              : isPoolBlock || isTail
+                ? null
+                : `${displayPercent(segment.percentOfPool).toFixed(1)}% of ${scale === "company" ? "company" : "pool"} · ${segment.units.toLocaleString()} units`;
+            const segmentTitle = isTail
+              ? (scale === "company"
+                ? `Not in pool — ${(segment.units / authorized * 100).toFixed(1)}% of company (${segment.units.toLocaleString()} units)`
+                : `Unallocated pool — ${(segment.units / poolUnits * 100).toFixed(1)}% of pool (${segment.units.toLocaleString()} units)`)
+              : isPoolBlock
+                ? `Equity pool — ${(segment.units / authorized * 100).toFixed(1)}% of company (${segment.units.toLocaleString()} units) — click to view breakdown`
+                : null;
             return (
               <div
-                className={isPoolBlock && scale === "company"
-                  ? "pool-bar-segment pool-bar-segment-clickable"
-                  : `pool-bar-segment${isExiting ? " is-exiting" : ""}`}
+                className={`pool-bar-segment${isExiting ? " is-exiting" : ""}${isPoolBlock && scale === "company" ? " pool-bar-segment-clickable" : ""}${routable ? " pool-bar-segment-clickable" : ""}${isHovered ? " is-hovered" : ""}`}
                 key={segment.label}
                 onClick={isPoolBlock && scale === "company"
                   ? () => setScale("pool")
+                  : routable
+                    ? () => routeSegment(segment)
+                    : undefined}
+                onMouseEnter={infoTitle && infoDetail
+                  ? () => showSegmentInfo(infoTitle, infoDetail, segment.label)
+                  : undefined}
+                onMouseLeave={infoTitle && infoDetail
+                  ? () => scheduleSegmentHide()
                   : undefined}
                 style={{
                   width: `${(segment.units / denominator) * 100}%`,
                   backgroundColor: segment.color,
                 }}
-                title={
-                  isTail
-                    ? scale === "company"
-                      ? `Not in pool — ${(segment.units / authorized * 100).toFixed(1)}% of company (${segment.units.toLocaleString()} units)`
-                      : `Unallocated pool — ${(segment.units / poolUnits * 100).toFixed(1)}% of pool (${segment.units.toLocaleString()} units)`
-                    : isPoolBlock
-                      ? `Equity pool — ${(segment.units / authorized * 100).toFixed(1)}% of company (${segment.units.toLocaleString()} units) — click to view breakdown`
-                      : `${segment.label} — ${displayPercent(segment.percentOfPool).toFixed(1)}% of ${scale === "company" ? "company" : "pool"} (${segment.units.toLocaleString()} units)`
-                }
+                title={segmentTitle ?? undefined}
               />
             );
           })}
+          </div>
         </div>
         <p className={`pool-scale-note${noteVisible ? "" : " is-switching"}`}>{noteText}</p>
         <div className="pool-legend" aria-label="Top unit holders">
