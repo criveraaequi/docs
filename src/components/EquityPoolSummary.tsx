@@ -292,6 +292,11 @@ export function EquityPoolSummary({ llc, holders }: EquityPoolSummaryProps) {
               <strong>{displayPercent(holder.percentOfPool).toFixed(1)}%</strong>
             </div>
           ))}
+          {hiddenHolderCount > 0 && (
+            <Link className="more-holders-link" to="/employees">
+              And {hiddenHolderCount} more holder{hiddenHolderCount === 1 ? "" : "s"}
+            </Link>
+          )}
           {scale === "pool" && consolidated && hiddenHolderCount > 0 && (
             <div className="legend-item" key="others">
               <span className="legend-swatch" style={{ backgroundColor: othersColor }} />
@@ -309,35 +314,6 @@ export function EquityPoolSummary({ llc, holders }: EquityPoolSummaryProps) {
           >
             {consolidated ? "Explode" : "Consolidate"}
           </button>
-        )}
-      </div>
-      <div className="holder-list">
-        <div className="list-header"><span>Holder</span><span>Share</span></div>
-        {visibleHolders.map((holder, index) => (
-          <div className="holder-row" key={holder.label}>
-            <div>
-              <div className="holder-name-line">
-                <span
-                  className="legend-swatch"
-                  style={{ backgroundColor: holderColors[index % holderColors.length] }}
-                />
-                {holder.employeeId ? (
-                  <Link className="holder-link" to={`/employees/${holder.employeeId}`}>
-                    {holder.label}
-                  </Link>
-                ) : (
-                  <strong>{holder.label}</strong>
-                )}
-              </div>
-              <span>{holder.role}</span>
-            </div>
-            <strong className="tnum">{displayPercent(holder.percentOfPool).toFixed(1)}%</strong>
-          </div>
-        ))}
-        {hiddenHolderCount > 0 && (
-          <Link className="more-holders-link" to="/employees">
-            And {hiddenHolderCount} more holder{hiddenHolderCount === 1 ? "" : "s"}
-          </Link>
         )}
       </div>
       <Link className="card-link" to="/employees">
