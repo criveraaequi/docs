@@ -15,6 +15,7 @@ import { AppShell } from "@/components/AppShell";
 import { formatDate } from "@/components/ValuationDetailModal";
 import { getAuthorizedUser, getEmployee, getLLCDetails } from "@/data/mockApi";
 import type { EquityGrant, ValuationEvent } from "@/data/types";
+import { fullMonthsBetween, strikePriceAt, todayIso, vestedUnitsAsOf } from "@/data/vesting";
 
 const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
@@ -27,43 +28,22 @@ interface VestingPoint {
   isToday: boolean;
 }
 
-function monthsBetween(fromIso: string, toIso: string): number {
-  return Math.round(
-    ((new Date(toIso).getTime() - new Date(fromIso).getTime()) / (365.25 * 24 * 60 * 60 * 1000)) * 12
-  );
-}
-
-/** Certified per-unit price in force at a given date (last valuation on or before it). */
-function priceAt(history: ValuationEvent[], isoDate: string): number {
-  const time = new Date(isoDate).getTime();
-  let price = history[0].resultingStrikePrice;
-  for (const event of history) {
-    if (new Date(event.date).getTime() <= time) price = event.resultingStrikePrice;
-  }
-  return price;
-}
-
 function buildVestingSeries(grant: EquityGrant, valuationHistory: ValuationEvent[]): VestingPoint[] {
-  const { unitsAwarded, vesting } = grant;
-  const months = vesting.scheduleLengthMonths;
-  const cliffMonths = Math.max(monthsBetween(vesting.grantDate, vesting.cliffDate), 0);
-  const monthsAfterCliff = Math.max(months - cliffMonths, 1);
-  const monthlyAfterCliff = unitsAwarded / monthsAfterCliff;
+  const { vesting } = grant;
+  const months = Math.max(fullMonthsBetween(vesting.grantDate, vesting.vestingCompletionDate), 1);
+  const cliffMonths = fullMonthsBetween(vesting.grantDate, vesting.cliffDate);
 
   const points: VestingPoint[] = [];
   for (let month = 0; month <= months; month += 1) {
     const date = new Date(vesting.grantDate);
     date.setMonth(date.getMonth() + month);
     const iso = date.toISOString().slice(0, 10);
-    const vestedUnits =
-      month < cliffMonths
-        ? 0
-        : Math.min(Math.round((month - cliffMonths) * monthlyAfterCliff), unitsAwarded);
+    const vestedUnits = vestedUnitsAsOf(grant, iso);
     points.push({
       label: date.toLocaleDateString("en-US", { month: "short", year: "2-digit" }),
       dateIso: iso,
       vestedUnits,
-      vestedValue: Math.round(vestedUnits * priceAt(valuationHistory, iso)),
+      vestedValue: Math.round(vestedUnits * strikePriceAt(valuationHistory, iso)),
       isCliff: month === cliffMonths,
       isToday: false,
     });
@@ -117,7 +97,7 @@ export function EmployeeDetailPage() {
     );
   }
 
-  const cliffMonths = Math.max(monthsBetween(grant.vesting.grantDate, grant.vesting.cliffDate), 0);
+  const cliffMonths = Math.max(fullMonthsBetween(grant.vesting.grantDate, grant.vesting.cliffDate), 0);
   const cliffLabel = formatDate(grant.vesting.cliffDate);
   const fullyVestedLabel = formatDate(grant.vesting.vestingCompletionDate);
   const latestValuation = history[history.length - 1];
@@ -149,24 +129,20 @@ export function EmployeeDetailPage() {
       : value.toLocaleString();
   const cliffPoint = series.find((point) => point.isCliff);
 
-  const todayIso = new Date().toISOString().slice(0, 10);
-  const todayTime = new Date(todayIso).getTime();
+  const today = todayIso();
+  const todayTime = new Date(today).getTime();
   const grantStartTime = new Date(grant.vesting.grantDate).getTime();
   const completionTime = new Date(grant.vesting.vestingCompletionDate).getTime();
   const showTodayMarker = todayTime >= grantStartTime && todayTime <= completionTime;
 
   const displaySeries = useMemo(() => {
     if (!showTodayMarker || series.length === 0) return series;
-    const cliffTime = new Date(grant.vesting.cliffDate).getTime();
-    const fraction = todayTime <= cliffTime
-      ? 0
-      : Math.min((todayTime - cliffTime) / (completionTime - cliffTime), 1);
-    const vestedUnits = Math.round(grant.unitsAwarded * fraction);
+    const vestedUnits = vestedUnitsAsOf(grant, today);
     const todayPoint: VestingPoint = {
-      label: new Date(todayIso).toLocaleDateString("en-US", { month: "short", year: "2-digit" }),
-      dateIso: todayIso,
+      label: new Date(today).toLocaleDateString("en-US", { month: "short", year: "2-digit" }),
+      dateIso: today,
       vestedUnits,
-      vestedValue: Math.round(vestedUnits * priceAt(history, todayIso)),
+      vestedValue: Math.round(vestedUnits * strikePriceAt(history, today)),
       isCliff: false,
       isToday: true,
     };
@@ -175,7 +151,7 @@ export function EmployeeDetailPage() {
     if (insertIndex === -1) next.push(todayPoint);
     else next.splice(insertIndex, 0, todayPoint);
     return next;
-  }, [series, showTodayMarker, todayTime, todayIso, grant, history, completionTime]);
+  }, [series, showTodayMarker, todayTime, today, grant, history, completionTime]);
 
   return (
     <AppShell llc={llc} owner={owner}>
@@ -254,9 +230,8 @@ export function EmployeeDetailPage() {
                     if (payload.isToday) {
                       return (
                         <g key={key} className="today-marker" tabIndex={0}>
-                          <circle cx={cx} cy={cy} r={14} fill="transparent" />
                           <circle cx={cx} cy={cy} r={11} fill="#b07d3a" className="today-marker-pulse" />
-                          <circle cx={cx} cy={cy} r={4.5} fill="#b07d3a" stroke="#fdfcf9" strokeWidth={2} />
+                          <circle cx={cx} cy={cy} r={4.5} fill="#b07d3a" stroke="#fdfcf9" strokeWidth={2} className="today-dot" />
                           <text x={cx} y={cy - 18} textAnchor="middle" fill="#b07d3a" fontSize={10} letterSpacing="0.08em">TODAY</text>
                         </g>
                       );

@@ -119,7 +119,7 @@ export const mockEmployees: Employee[] = [
         scheduleLengthMonths: 36,
         monthlyVestingRate: 27.78, // (1000 / 36) per month after cliff
       },
-      currentVestedAmount: 0, // still in cliff period
+      currentVestedAmount: 0, // seed value — recomputed live in mockApi (see withLiveVesting)
       currentPayoutValue: 0,
     },
   },
@@ -198,7 +198,7 @@ export const mockEmployees: Employee[] = [
         scheduleLengthMonths: 48,
         monthlyVestingRate: 41.67, // (2000 / 48) per month after cliff
       },
-      currentVestedAmount: 0, // still in cliff period
+      currentVestedAmount: 0, // seed value — recomputed live in mockApi (see withLiveVesting)
       currentPayoutValue: 0,
     },
   },

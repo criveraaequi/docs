@@ -140,7 +140,7 @@
 .payout-chart-card { display: grid; gap: 8px; }
 .payout-chart { height: 300px; }
 .today-marker-pulse { animation: today-pulse 2s ease-in-out 3 forwards; transform-box: fill-box; transform-origin: center; }
-.today-marker:hover .today-marker-pulse, .today-marker:focus .today-marker-pulse {
+.today-marker .today-dot:hover ~ .today-marker-pulse, .today-marker .today-dot:focus ~ .today-marker-pulse {
   animation: today-pulse 2s ease-in-out infinite;
 }
 @keyframes today-pulse {

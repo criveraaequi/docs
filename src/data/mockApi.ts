@@ -21,6 +21,7 @@ import {
   mockLLCs,
   mockPlatformAdmins,
 } from "./mockData";
+import { employeeVestedPayout, employeeVestedUnits } from "./vesting";
 
 // ---------------------------------------------------------------------------
 // LLC queries
@@ -59,26 +60,31 @@ export function getCurrentStrikePrice(llcId: string): number | null {
 // Employee / Grant queries
 // ---------------------------------------------------------------------------
 
-/** Returns all employees for a given LLC (LLC Owner view). */
+/**
+ * Returns all employees for a given LLC (LLC Owner view).
+ * Vested amounts and payout values are computed live from each grant's
+ * schedule and the LLC's valuation history, so they stay correct as time passes.
+ */
 export function getEmployeesByLLC(llcId: string): Employee[] {
-  return mockEmployees.filter((emp) => emp.llcId === llcId);
+  return mockEmployees
+    .filter((emp) => emp.llcId === llcId)
+    .map((emp) => withLiveVesting(emp));
 }
 
 /** Returns a single employee by ID. */
 export function getEmployee(employeeId: string): Employee | null {
-  return mockEmployees.find((emp) => emp.id === employeeId) ?? null;
+  const emp = mockEmployees.find((emp) => emp.id === employeeId) ?? null;
+  return emp ? withLiveVesting(emp) : null;
 }
 
 /** Returns all employees across all LLCs (Platform Admin view). */
 export function getAllEmployees(): Employee[] {
-  return mockEmployees;
+  return mockEmployees.map((emp) => withLiveVesting(emp));
 }
 
 /** Returns all employees with grants for a given LLC. */
 export function getEmployeeGrants(llcId: string): Employee[] {
-  return mockEmployees.filter(
-    (emp) => emp.llcId === llcId && emp.grant !== null
-  );
+  return getEmployeesByLLC(llcId).filter((emp) => emp.grant !== null);
 }
 
 /**
@@ -121,6 +127,22 @@ export function getTopUnitHolders(
   }
 
   return segments;
+}
+
+/** Replaces seed vested amounts with schedule-derived values as of today. */
+function withLiveVesting(employee: Employee): Employee {
+  if (!employee.grant) return employee;
+  const llc = mockLLCs.find((llc) => llc.id === employee.llcId);
+  const history = llc?.valuationHistory ?? [];
+  const units = employeeVestedUnits(employee);
+  return {
+    ...employee,
+    grant: {
+      ...employee.grant,
+      currentVestedAmount: units,
+      currentPayoutValue: employeeVestedPayout(employee, history),
+    },
+  };
 }
 
 /** Returns a single employee's grant details. */
