@@ -23,6 +23,7 @@ const holderColors = [
 ];
 const poolRemainderColor = "#eceae2";
 const companyRemainderColor = "#d9d7ce";
+const othersColor = "#8a93a3"; // slate — shared by all non-top-3 holders when consolidated
 
 type BarScale = "company" | "pool";
 
@@ -38,6 +39,7 @@ const EXIT_MS = 300;
 
 export function EquityPoolSummary({ llc, holders }: EquityPoolSummaryProps) {
   const [scale, setScale] = useState<BarScale>("company");
+  const [consolidated, setConsolidated] = useState(false);
 
   const authorized = llc.totalUnitsAuthorized;
   const poolUnits = (llc.equityPoolPercent / 100) * authorized;
@@ -48,6 +50,8 @@ export function EquityPoolSummary({ llc, holders }: EquityPoolSummaryProps) {
     scale === "company" ? percentOfPool * companyFactor : percentOfPool;
   const visibleHolders = roleHolders.slice(0, 3);
   const hiddenHolderCount = roleHolders.length - visibleHolders.length;
+  const othersUnits = roleHolders.slice(3).reduce((sum, holder) => sum + holder.units, 0);
+  const othersPercent = roleHolders.slice(3).reduce((sum, holder) => sum + holder.percentOfPool, 0);
 
   // Company view: one solid navy block for the whole pool, then the rest of
   // the company — no per-holder separations at this zoom. Pool view: the bar
@@ -65,10 +69,20 @@ export function EquityPoolSummary({ llc, holders }: EquityPoolSummaryProps) {
         { label: "remainder", role: null, units: tailUnits, percentOfPool: 0, color: companyRemainderColor },
       ]
     : [
-      ...roleHolders.map((holder, index) => ({
-        ...holder,
-        color: holderColors[index % holderColors.length],
-      })),
+      ...(consolidated
+        ? [
+            ...visibleHolders.map((holder, index) => ({
+              ...holder,
+              color: holderColors[index],
+            })),
+            ...(othersUnits > 0
+              ? [{ label: "Others", role: null, units: othersUnits, percentOfPool: othersPercent, color: othersColor }]
+              : []),
+          ]
+        : roleHolders.map((holder, index) => ({
+            ...holder,
+            color: holderColors[index % holderColors.length],
+          }))),
       ...(tailUnits > 0
         ? [{ label: "remainder", role: null, units: tailUnits, percentOfPool: 0, color: poolRemainderColor }]
         : []),
@@ -109,7 +123,7 @@ export function EquityPoolSummary({ llc, holders }: EquityPoolSummaryProps) {
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scale]);
+  }, [scale, consolidated]);
 
   const [noteText, setNoteText] = useState(
     `Bar is the full ${authorized.toLocaleString()}-unit company — holders shown as shares of the company.`
@@ -128,6 +142,10 @@ export function EquityPoolSummary({ llc, holders }: EquityPoolSummaryProps) {
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scale]);
+
+  const barAriaHolders = consolidated
+    ? [...visibleHolders, { label: "Others", percentOfPool: othersPercent }]
+    : roleHolders;
 
   return (
     <section className="card summary-card">
@@ -157,7 +175,7 @@ export function EquityPoolSummary({ llc, holders }: EquityPoolSummaryProps) {
           role="img"
           aria-label={scale === "company"
             ? `Pool allocation (share of company): equity pool ${(poolUnits / authorized * 100).toFixed(1)}%`
-            : `Pool allocation (share of equity pool): ${roleHolders
+            : `Pool allocation (share of equity pool): ${barAriaHolders
               .map((holder) => `${holder.label} ${displayPercent(holder.percentOfPool).toFixed(1)}%`)
               .join(", ")}`}
         >
@@ -209,7 +227,24 @@ export function EquityPoolSummary({ llc, holders }: EquityPoolSummaryProps) {
               <strong>{displayPercent(holder.percentOfPool).toFixed(1)}%</strong>
             </div>
           ))}
+          {scale === "pool" && consolidated && hiddenHolderCount > 0 && (
+            <div className="legend-item" key="others">
+              <span className="legend-swatch" style={{ backgroundColor: othersColor }} />
+              <span>Others ({hiddenHolderCount})</span>
+              <strong>{displayPercent(othersPercent).toFixed(1)}%</strong>
+            </div>
+          )}
         </div>
+        {scale === "pool" && hiddenHolderCount > 0 && (
+          <button
+            className="consolidate-toggle"
+            type="button"
+            onClick={() => setConsolidated((current) => !current)}
+            aria-pressed={consolidated}
+          >
+            {consolidated ? "Explode" : "Consolidate"}
+          </button>
+        )}
       </div>
       <div className="holder-list">
         <div className="list-header"><span>Holder</span><span>Share</span></div>

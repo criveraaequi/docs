@@ -53,6 +53,9 @@
 .holder-name-line .legend-swatch { flex: 0 0 8px; }
 .more-holders-link { margin-top: 10px; display: inline-block; color: var(--slate); font-size: 12px; transition: color .15s ease; }
 .more-holders-link:hover { color: var(--navy); }
+.consolidate-toggle { justify-self: end; padding: 5px 10px; border: none; background: none; color: var(--slate); font-size: 12px; font-weight: 500; cursor: pointer; transition: color .15s ease; }
+.consolidate-toggle:hover { color: var(--navy); text-decoration: underline; }
+.consolidate-toggle[aria-pressed="true"] { color: var(--navy); }
 .holder-row div { display: grid; gap: 2px; }
 .holder-row strong { font-size: 13px; font-weight: 500; }
 .holder-row span { color: var(--slate); font-size: 12px; }
