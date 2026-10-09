@@ -25,7 +25,7 @@ export const mockLLCs: LLC[] = [
     subscriptionPlan: "Growth",
     equityPoolPercent: 10,
     totalUnitsAuthorized: 50000,
-    unitsIssued: 12000,
+    unitsIssued: 4950, // equals total units granted across all 9 Summit holders
     valuationHistory: [
       {
         date: "2025-06-20",
@@ -226,6 +226,162 @@ export const mockEmployees: Employee[] = [
       },
       currentVestedAmount: 466, // ~14 months past cliff
       currentPayoutValue: 41_357, // 466 × 88.75
+    },
+  },
+  {
+    id: "emp-6",
+    name: "Danielle Foster",
+    roleOrPosition: "Service Dispatcher",
+    tenureYears: 2.5,
+    employmentStatus: "active",
+    terminationDate: null,
+    llcId: "llc-1",
+    w2Salary: 52_000,
+    grant: {
+      unitsAwarded: 420,
+      strikePricePerUnit: 84.0,
+      grantDate: "2024-05-10",
+      contractDocumentName: "Summit_HVAC_Foster_Contract.pdf",
+      vesting: {
+        scheduleType: "standard",
+        grantDate: "2024-05-10",
+        cliffDate: "2025-05-10",
+        vestingCompletionDate: "2027-05-10",
+        scheduleLengthMonths: 36,
+        monthlyVestingRate: 17.5, // (420 / 24) per month after cliff
+      },
+      currentVestedAmount: 0, // seed value — recomputed live in mockApi (see withLiveVesting)
+      currentPayoutValue: 0,
+    },
+  },
+  {
+    id: "emp-7",
+    name: "Marcus Okafor",
+    roleOrPosition: "Installation Lead",
+    tenureYears: 5.0,
+    employmentStatus: "active",
+    terminationDate: null,
+    llcId: "llc-1",
+    w2Salary: 68_000,
+    grant: {
+      unitsAwarded: 450,
+      strikePricePerUnit: 84.0,
+      grantDate: "2024-11-20",
+      contractDocumentName: "Summit_HVAC_Okafor_Contract.pdf",
+      vesting: {
+        scheduleType: "standard",
+        grantDate: "2024-11-20",
+        cliffDate: "2025-11-20",
+        vestingCompletionDate: "2028-11-20",
+        scheduleLengthMonths: 48,
+        monthlyVestingRate: 12.5, // (450 / 36) per month after cliff
+      },
+      currentVestedAmount: 0, // seed value — recomputed live in mockApi (see withLiveVesting)
+      currentPayoutValue: 0,
+    },
+  },
+  {
+    id: "emp-8",
+    name: "Priya Raman",
+    roleOrPosition: "Parts & Inventory Coordinator",
+    tenureYears: 1.5,
+    employmentStatus: "active",
+    terminationDate: null,
+    llcId: "llc-1",
+    w2Salary: 46_000,
+    grant: {
+      unitsAwarded: 210,
+      strikePricePerUnit: 84.0,
+      grantDate: "2025-04-01",
+      contractDocumentName: "Summit_HVAC_Raman_Contract.pdf",
+      vesting: {
+        scheduleType: "standard",
+        grantDate: "2025-04-01",
+        cliffDate: "2026-04-01",
+        vestingCompletionDate: "2027-04-01",
+        scheduleLengthMonths: 24,
+        monthlyVestingRate: 17.5, // (210 / 12) per month after cliff
+      },
+      currentVestedAmount: 0, // seed value — recomputed live in mockApi (see withLiveVesting)
+      currentPayoutValue: 0,
+    },
+  },
+  {
+    id: "emp-9",
+    name: "Diego Salazar",
+    roleOrPosition: "Comfort Advisor",
+    tenureYears: 3.0,
+    employmentStatus: "active",
+    terminationDate: null,
+    llcId: "llc-1",
+    w2Salary: 58_000,
+    grant: {
+      unitsAwarded: 380,
+      strikePricePerUnit: 84.0,
+      grantDate: "2025-08-15",
+      contractDocumentName: "Summit_HVAC_Salazar_Contract.pdf",
+      vesting: {
+        scheduleType: "standard",
+        grantDate: "2025-08-15",
+        cliffDate: "2026-08-15",
+        vestingCompletionDate: "2028-08-15",
+        scheduleLengthMonths: 36,
+        monthlyVestingRate: 15.83, // (380 / 24) per month after cliff
+      },
+      currentVestedAmount: 0, // seed value — recomputed live in mockApi (see withLiveVesting)
+      currentPayoutValue: 0,
+    },
+  },
+  {
+    id: "emp-10",
+    name: "Hannah Liu",
+    roleOrPosition: "Office Administrator",
+    tenureYears: 2.0,
+    employmentStatus: "active",
+    terminationDate: null,
+    llcId: "llc-1",
+    w2Salary: 44_000,
+    grant: {
+      unitsAwarded: 165,
+      strikePricePerUnit: 84.0,
+      grantDate: "2025-12-01",
+      contractDocumentName: "Summit_HVAC_Liu_Contract.pdf",
+      vesting: {
+        scheduleType: "standard",
+        grantDate: "2025-12-01",
+        cliffDate: "2026-12-01",
+        vestingCompletionDate: "2027-12-01",
+        scheduleLengthMonths: 24,
+        monthlyVestingRate: 13.75, // (165 / 12) per month after cliff
+      },
+      currentVestedAmount: 0, // seed value — recomputed live in mockApi (see withLiveVesting)
+      currentPayoutValue: 0,
+    },
+  },
+  {
+    id: "emp-11",
+    name: "Terrence Boyd",
+    roleOrPosition: "Warehouse Technician",
+    tenureYears: 3.5,
+    employmentStatus: "terminated",
+    terminationDate: "2026-03-31",
+    llcId: "llc-1",
+    w2Salary: 41_000,
+    grant: {
+      unitsAwarded: 325,
+      strikePricePerUnit: 84.0,
+      grantDate: "2024-02-01",
+      contractDocumentName: "Summit_HVAC_Boyd_Contract.pdf",
+      vesting: {
+        scheduleType: "standard",
+        grantDate: "2024-02-01",
+        cliffDate: "2025-02-01",
+        vestingCompletionDate: "2027-02-01",
+        scheduleLengthMonths: 36,
+        monthlyVestingRate: 13.54, // (325 / 24) per month after cliff
+      },
+      currentVestedAmount: 0, // seed value — recomputed live in mockApi (see withLiveVesting)
+      currentPayoutValue: 0,
     },
   },
 ];

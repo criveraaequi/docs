@@ -161,7 +161,7 @@ export function EmployeeListPage() {
           <div className="stat-card">
             <strong>{granted.length}</strong>
             <span className="stat-label">Employees with grants</span>
-            <span className="stat-sub">of {employees.length} on the team</span>
+            <span className="stat-sub">of {llc.employeeCount} employees enrolled</span>
           </div>
           <div className="stat-card">
             <strong>{totalUnits.toLocaleString()}</strong>
