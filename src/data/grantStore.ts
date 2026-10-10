@@ -467,13 +467,14 @@ export function getSeededEmployees(llcId: string): Employee[] {
 // --- Demo reset ---------------------------------------------------------------
 
 /** Erases every runtime record (grants, expansions, notifications) from the database. */
+const NIL_UUID = "00000000-0000-0000-0000-000000000000";
 export async function resetDemoData(): Promise<void> {
   const failed: string[] = [];
-  const { error: grantsError } = await supabase.from("grants").delete().neq("id", "");
+  const { error: grantsError } = await supabase.from("grants").delete().neq("id", NIL_UUID);
   if (grantsError) failed.push("grants");
-  const { error: expansionsError } = await supabase.from("pool_expansions").delete().neq("id", "");
+  const { error: expansionsError } = await supabase.from("pool_expansions").delete().neq("id", NIL_UUID);
   if (expansionsError) failed.push("pool expansions");
-  const { error: notificationsError } = await supabase.from("notifications").delete().neq("id", "");
+  const { error: notificationsError } = await supabase.from("notifications").delete().neq("id", NIL_UUID);
   if (notificationsError) failed.push("notifications");
   if (failed.length > 0) {
     throw new Error(`Could not clear ${failed.join(", ")}`);
