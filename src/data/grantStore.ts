@@ -357,7 +357,9 @@ export function getEffectivePool(llcId: string): {
   if (!approved) return base;
   return {
     equityPoolPercent: approved.newPercent,
-    totalUnitsAuthorized: approved.newAuthorizedUnits,
+    // new_authorized_units is the pool's unit count, not the company's —
+    // company units are unchanged by an expansion.
+    totalUnitsAuthorized: base.totalUnitsAuthorized,
   };
 }
 
