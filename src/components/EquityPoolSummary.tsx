@@ -155,7 +155,7 @@ export function EquityPoolSummary({ llc, holders, onExpandPool }: EquityPoolSumm
       setNoteText(
         scale === "company"
           ? `Bar is the full ${authorized.toLocaleString()}-unit company — holders shown as shares of the company.`
-          : `Bar is the ${llc.equityPoolPercent}% equity pool (${poolUnits.toLocaleString()} units) — holders shown as shares of the pool.`
+          : `Bar is the ${effectivePool.equityPoolPercent}% equity pool (${poolUnits.toLocaleString()} units) — holders shown as shares of the pool.`
       );
       setNoteVisible(true);
     }, 200);

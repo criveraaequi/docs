@@ -21,6 +21,7 @@ import {
   mockLLCs,
   mockPlatformAdmins,
 } from "./mockData";
+import { getEffectivePool } from "./grantStore";
 import { employeeVestedPayout, employeeVestedUnits } from "./vesting";
 
 // ---------------------------------------------------------------------------
@@ -100,7 +101,8 @@ export function getTopUnitHolders(
   const llc = getLLCDetails(llcId);
   if (!llc) return [];
 
-  const poolUnits = (llc.equityPoolPercent / 100) * llc.totalUnitsAuthorized;
+  const effectivePool = getEffectivePool(llcId);
+  const poolUnits = (effectivePool.equityPoolPercent / 100) * effectivePool.totalUnitsAuthorized;
   const employees = getEmployeeGrants(llcId)
     .sort((a, b) => (b.grant?.unitsAwarded ?? 0) - (a.grant?.unitsAwarded ?? 0))
     .slice(0, limit);
