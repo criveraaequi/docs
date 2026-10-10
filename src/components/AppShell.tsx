@@ -1,10 +1,11 @@
-import { Bell, ChevronDown, FileText, Menu, MessageSquare, X } from "lucide-react";
+import { Bell, ChevronDown, FileText, Menu, MessageSquare, RotateCcw, X } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   getNotifications,
   getUnreadCount,
   markNotificationRead,
+  resetDemoData,
 } from "@/data/grantStore";
 import { useGrantStore } from "@/data/useGrantStore";
 import type { LLC, LLCAuthorizedUser } from "@/data/types";
@@ -18,7 +19,11 @@ interface AppShellProps {
 export function AppShell({ llc, owner, children }: AppShellProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
   const notifRef = useRef<HTMLDivElement | null>(null);
+  const resetRef = useRef<HTMLDivElement | null>(null);
   const navigate = useNavigate();
   useGrantStore();
 
@@ -35,6 +40,33 @@ export function AppShell({ llc, owner, children }: AppShellProps) {
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
   }, [notifOpen]);
+
+  useEffect(() => {
+    if (!resetOpen) return;
+    const onClick = (event: MouseEvent) => {
+      if (resetRef.current && !resetRef.current.contains(event.target as Node)) {
+        setResetOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [resetOpen]);
+
+  const handleReset = async () => {
+    setResetError(null);
+    setResetting(true);
+    try {
+      await resetDemoData();
+      setResetOpen(false);
+      setNotifOpen(false);
+      setIsMenuOpen(false);
+      navigate("/");
+    } catch {
+      setResetError("Couldn't reset the demo data. Check your connection and try again.");
+    } finally {
+      setResetting(false);
+    }
+  };
 
   return (
     <div className="app-shell">
@@ -61,6 +93,43 @@ export function AppShell({ llc, owner, children }: AppShellProps) {
             <span>Contracts</span>
             <ChevronDown size={14} />
           </Link>
+          <div className="restart-wrap" ref={resetRef}>
+            <button
+              className="header-action restart-demo-button"
+              type="button"
+              onClick={() => setResetOpen((open) => !open)}
+            >
+              <RotateCcw size={16} strokeWidth={1.7} />
+              <span>Restart demo</span>
+            </button>
+            {resetOpen && (
+              <div className="restart-confirm" role="alertdialog" aria-label="Restart demo">
+                <p>
+                  Erase all grants, pool expansions, and notifications created during this demo and
+                  restore the original starting data?
+                </p>
+                {resetError && <p className="restart-error">{resetError}</p>}
+                <div className="restart-confirm-actions">
+                  <button
+                    className="button-primary"
+                    type="button"
+                    onClick={() => void handleReset()}
+                    disabled={resetting}
+                  >
+                    {resetting ? "Resetting…" : "Yes, reset demo"}
+                  </button>
+                  <button
+                    className="button-secondary"
+                    type="button"
+                    onClick={() => setResetOpen(false)}
+                    disabled={resetting}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
           <button className="icon-button" type="button" aria-label="Messages">
             <MessageSquare size={18} strokeWidth={1.7} />
           </button>

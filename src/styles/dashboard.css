@@ -418,6 +418,21 @@
 .expansion-verify-head { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 16px; color: #1f3164; }
 .expansion-verify-head h3 { margin: 0 0 4px; font-size: 1rem; color: #23272f; }
 
+/* --- Restart demo ----------------------------------------------------------- */
+
+.restart-wrap { position: relative; }
+.restart-demo-button { background: none; border: none; cursor: pointer; padding: 4px 0; }
+.restart-demo-button:hover { color: #2a4182; }
+.restart-confirm {
+  position: absolute; right: 0; top: calc(100% + 10px); width: 300px; z-index: 50;
+  background: #fdfcf9; border: 1px solid rgba(138, 147, 163, 0.3); border-radius: 10px;
+  box-shadow: 0 16px 40px rgba(24, 30, 44, 0.18);
+  padding: 16px; animation: wizard-rise 0.18s ease;
+}
+.restart-confirm p { margin: 0 0 12px; font-size: 0.84rem; color: #23272f; line-height: 1.5; }
+.restart-confirm .restart-error { color: #ad5f3e; font-size: 0.78rem; }
+.restart-confirm-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
 /* --- Notifications -------------------------------------------------------- */
 
 .notification-wrap { position: relative; }

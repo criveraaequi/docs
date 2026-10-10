@@ -463,3 +463,26 @@ export async function markNotificationRead(id: string): Promise<void> {
 export function getSeededEmployees(llcId: string): Employee[] {
   return mockEmployees.filter((emp) => emp.llcId === llcId);
 }
+
+// --- Demo reset ---------------------------------------------------------------
+
+/** Erases every runtime record (grants, expansions, notifications) from the database. */
+export async function resetDemoData(): Promise<void> {
+  const failed: string[] = [];
+  const { error: grantsError } = await supabase.from("grants").delete().neq("id", "");
+  if (grantsError) failed.push("grants");
+  const { error: expansionsError } = await supabase.from("pool_expansions").delete().neq("id", "");
+  if (expansionsError) failed.push("pool expansions");
+  const { error: notificationsError } = await supabase.from("notifications").delete().neq("id", "");
+  if (notificationsError) failed.push("notifications");
+  if (failed.length > 0) {
+    throw new Error(`Could not clear ${failed.join(", ")}`);
+  }
+  grantsCache = [];
+  grantsPromise = null;
+  expansionsCache = [];
+  expansionsPromise = null;
+  notificationsCache = [];
+  notificationsPromise = null;
+  notify();
+}
