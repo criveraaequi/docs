@@ -2,6 +2,8 @@
 
 Read this file first. It is the persistent context for the Aequi app; it carries over between chats so the project doesn't lose direction.
 
+> **Backend engineer?** Start with `BACKEND_HANDOFF.md` — it covers what's real vs. placeholder, the security posture, and the diligence checklist.
+
 ## What Aequi is
 
 Aequi is a phantom-equity (synthetic equity) platform for small LLCs. Business owners grant employees "phantom units" that vest over time and pay out cash based on the company's certified valuation — no real shares, no dilution.
