@@ -13,7 +13,13 @@ import {
 } from "recharts";
 import { AppShell } from "@/components/AppShell";
 import { formatDate } from "@/components/ValuationDetailModal";
+import {
+  getGrantsForEmployee,
+  signGrant,
+  type GrantRecord,
+} from "@/data/grantStore";
 import { getAuthorizedUser, getEmployee, getLLCDetails } from "@/data/mockApi";
+import { useGrantStore } from "@/data/useGrantStore";
 import type { EquityGrant, ValuationEvent } from "@/data/types";
 import { fullMonthsBetween, strikePriceAt, todayIso, vestedUnitsAsOf } from "@/data/vesting";
 
@@ -58,10 +64,14 @@ function formatYears(months: number): string {
 
 export function EmployeeDetailPage() {
   const { employeeId } = useParams<{ employeeId: string }>();
+  useGrantStore();
   const employee = employeeId ? getEmployee(employeeId) : null;
   const llc = employee ? getLLCDetails(employee.llcId) : null;
   const owner = llc ? getAuthorizedUser(llc.id) : null;
   const [showValue, setShowValue] = useState(true);
+
+  const runtimeGrants = employeeId ? getGrantsForEmployee(employeeId) : [];
+  const pendingGrants = runtimeGrants.filter((grant) => grant.status === "pending");
 
   const grant = employee?.grant ?? null;
   const history = llc?.valuationHistory ?? [];
@@ -78,17 +88,20 @@ export function EmployeeDetailPage() {
 
   if (!grant) {
     return (
-      <AppShell llc={llc} owner={owner}>
+      <AppShell llc={llc!} owner={owner}>
         <div className="history-page">
           <Link className="back-link" to="/"><ArrowLeft size={15} /> Back to dashboard</Link>
           <div className="page-intro history-intro">
             <div>
-              <span className="eyebrow">Equity grant · {llc.name}</span>
+              <span className="eyebrow">Equity grant · {llc!.name}</span>
               <h1>{employee.name}</h1>
               <p>{employee.roleOrPosition}</p>
             </div>
             <span className="mock-badge">Mock data</span>
           </div>
+          {pendingGrants.length > 0 && (
+            <PendingGrantsCard grants={pendingGrants} />
+          )}
           <section className="card">
             <p className="empty-state">No equity grant has been issued for this employee yet.</p>
           </section>
@@ -157,6 +170,8 @@ export function EmployeeDetailPage() {
     <AppShell llc={llc} owner={owner}>
       <div className="history-page employee-page">
         <Link className="back-link" to="/"><ArrowLeft size={15} /> Back to dashboard</Link>
+
+        {pendingGrants.length > 0 && <PendingGrantsCard grants={pendingGrants} />}
 
         <section className="card payout-hero">
           <div className="payout-hero-header">
@@ -282,7 +297,73 @@ export function EmployeeDetailPage() {
             </div>
           </div>
         </section>
+
+        {runtimeGrants.length > 0 && (
+          <section className="card">
+            <div className="card-heading">
+              <div>
+                <span className="eyebrow">Recent grants</span>
+                <h2>Created on Aequi</h2>
+              </div>
+            </div>
+            <div className="runtime-grants-list">
+              {runtimeGrants.map((runtimeGrant) => (
+                <div className="runtime-grant-row" key={runtimeGrant.id}>
+                  <div>
+                    <strong>{runtimeGrant.unitsAwarded.toLocaleString()} units</strong>
+                    <span>
+                      {formatDate(runtimeGrant.grantDate)} · {runtimeGrant.scheduleLengthMonths} months ·{" "}
+                      ${runtimeGrant.strikePricePerUnit.toFixed(2)} per unit
+                    </span>
+                  </div>
+                  <div className="runtime-grant-meta">
+                    {runtimeGrant.status === "pending" ? (
+                      <span className="status-label status-pending">Pending signature</span>
+                    ) : (
+                      <Link className="contract-link" to={`/contracts/${runtimeGrant.id}`}>
+                        View contract <ArrowUpRight size={13} />
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
       </div>
     </AppShell>
+  );
+}
+
+function PendingGrantsCard({ grants }: { grants: GrantRecord[] }) {
+  return (
+    <section className="card pending-grants-card">
+      <div className="card-heading">
+        <div>
+          <span className="eyebrow">Awaiting signature</span>
+          <h2>Pending grants</h2>
+        </div>
+      </div>
+      {grants.map((pendingGrant) => (
+        <div className="runtime-grant-row" key={pendingGrant.id}>
+          <div>
+            <strong>{pendingGrant.unitsAwarded.toLocaleString()} units</strong>
+            <span>
+              {formatDate(pendingGrant.grantDate)} · {pendingGrant.scheduleLengthMonths} months · 1-year cliff
+            </span>
+          </div>
+          <div className="runtime-grant-meta">
+            <span className="status-label status-pending">Pending</span>
+            <button
+              className="button-secondary simulate-sign-button"
+              type="button"
+              onClick={() => void signGrant(pendingGrant.id)}
+            >
+              Simulate employee signing (demo)
+            </button>
+          </div>
+        </div>
+      ))}
+    </section>
   );
 }

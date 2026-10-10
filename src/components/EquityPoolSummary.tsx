@@ -1,11 +1,19 @@
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, TrendingUp } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import {
+  approvePoolExpansion,
+  getEffectivePool,
+  getExpansionsForLLC,
+  getPoolAllocatedUnits,
+  getPoolPendingUnits,
+} from "@/data/grantStore";
 import type { LLC, UnitHolderSegment } from "@/data/types";
 
 interface EquityPoolSummaryProps {
   llc: LLC;
   holders: UnitHolderSegment[];
+  onExpandPool?: () => void;
 }
 
 // Ordered so adjacent segments contrast in hue and lightness; the rank-1
@@ -38,7 +46,7 @@ interface Segment {
 
 const EXIT_MS = 300;
 
-export function EquityPoolSummary({ llc, holders }: EquityPoolSummaryProps) {
+export function EquityPoolSummary({ llc, holders, onExpandPool }: EquityPoolSummaryProps) {
   const [scale, setScale] = useState<BarScale>("company");
   const [consolidated, setConsolidated] = useState(false);
   const navigate = useNavigate();
@@ -50,7 +58,11 @@ export function EquityPoolSummary({ llc, holders }: EquityPoolSummaryProps) {
   const hideTimer = useRef<number | null>(null);
 
   const authorized = llc.totalUnitsAuthorized;
-  const poolUnits = (llc.equityPoolPercent / 100) * authorized;
+  const effectivePool = getEffectivePool(llc.id);
+  const poolUnits = Math.round((effectivePool.equityPoolPercent / 100) * effectivePool.totalUnitsAuthorized);
+  const pendingExpansion = getExpansionsForLLC(llc.id).find((expansion) => expansion.status === "pending");
+  const allocatedRuntimeUnits = getPoolAllocatedUnits(llc.id);
+  const pendingUnits = getPoolPendingUnits(llc.id);
   const roleHolders = holders.filter((holder) => holder.role !== null);
   const allocatedUnits = roleHolders.reduce((sum, holder) => sum + holder.units, 0);
   const companyFactor = poolUnits / authorized;
@@ -204,11 +216,37 @@ export function EquityPoolSummary({ llc, holders }: EquityPoolSummaryProps) {
       </div>
       <div className="pool-visual">
         <div className="pool-stat">
-          <strong>{llc.unitsIssued.toLocaleString()}</strong>
+          <strong>{allocatedRuntimeUnits.toLocaleString()}</strong>
           <span>
-            issued units of {authorized.toLocaleString()} authorized
+            issued units of {poolUnits.toLocaleString()} in the {effectivePool.equityPoolPercent}% pool
           </span>
         </div>
+        {pendingUnits > 0 && (
+          <div className="pool-pending-note" role="status">
+            <strong>{pendingUnits.toLocaleString()} units</strong> pending employee signature — not
+            yet counted against the pool.
+          </div>
+        )}
+        {pendingExpansion && (
+          <div className="pool-expansion-note" role="status">
+            <div>
+              <strong>
+                Pool expansion to {pendingExpansion.newPercent}% ({pendingExpansion.newAuthorizedUnits.toLocaleString()} units)
+                pending approval
+              </strong>
+              <span>Demo: approve to apply the new pool size.</span>
+            </div>
+            <button
+              className="button-secondary"
+              type="button"
+              onClick={() => {
+                void approvePoolExpansion(pendingExpansion.id);
+              }}
+            >
+              <TrendingUp size={14} /> Approve
+            </button>
+          </div>
+        )}
         <div className="pool-bar-wrap">
           {hoverInfo && (
             <div className="segment-infobox" role="status">
@@ -316,9 +354,16 @@ export function EquityPoolSummary({ llc, holders }: EquityPoolSummaryProps) {
           </button>
         )}
       </div>
-      <Link className="card-link" to="/employees">
-        View full Employee List <ArrowUpRight size={15} />
-      </Link>
+      <div className="card-link-row">
+        {onExpandPool && (
+          <button className="card-link card-link-button" type="button" onClick={onExpandPool}>
+            Expand phantom pool <TrendingUp size={15} />
+          </button>
+        )}
+        <Link className="card-link" to="/employees">
+          View full Employee List <ArrowUpRight size={15} />
+        </Link>
+      </div>
     </section>
   );
 }

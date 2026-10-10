@@ -1,8 +1,11 @@
 import { ArrowLeft, ArrowUpRight, ChevronDown, Search } from "lucide-react";
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { AppShell } from "@/components/AppShell";
+import { GrantWizard } from "@/components/GrantWizard";
+import { getGrantsForEmployee } from "@/data/grantStore";
 import { getAuthorizedUser, getEmployeesByLLC, getLLCDetails } from "@/data/mockApi";
+import { useGrantStore } from "@/data/useGrantStore";
 import type { Employee, EmploymentStatus } from "@/data/types";
 
 const LLC_ID = "llc-1";
@@ -64,8 +67,13 @@ function sortEmployees(employees: Employee[], sort: SortState): Employee[] {
   });
 }
 
-function EmployeeRow({ employee, onViewContract }: { employee: Employee; onViewContract: (name: string) => void }) {
+function EmployeeRow({ employee, onOpenContract }: { employee: Employee; onOpenContract: (employee: Employee) => void }) {
   const grant = employee.grant;
+  const runtimeGrants = getGrantsForEmployee(employee.id);
+  const pendingCount = runtimeGrants.filter((g) => g.status === "pending").length;
+  const signedRuntime = runtimeGrants.find((g) => g.status === "active");
+  const units = (grant?.unitsAwarded ?? 0)
+    + runtimeGrants.filter((g) => g.status === "active").reduce((sum, g) => sum + g.unitsAwarded, 0);
   return (
     <div className="employee-row">
       <div className="employee-name-cell">
@@ -73,21 +81,26 @@ function EmployeeRow({ employee, onViewContract }: { employee: Employee; onViewC
         <span>{employee.roleOrPosition}</span>
       </div>
       <span className={statusLabelClass(employee.employmentStatus)}>{STATUS_LABEL[employee.employmentStatus]}</span>
-      <strong>{grant ? grant.unitsAwarded.toLocaleString() : "—"}</strong>
+      <strong>{units > 0 ? units.toLocaleString() : "—"}</strong>
       <strong>{grant ? grant.currentVestedAmount.toLocaleString() : "—"}</strong>
       <strong>{grant ? currency.format(grant.currentPayoutValue) : "—"}</strong>
-      {grant ? (
-        <button className="contract-link" type="button" onClick={() => onViewContract(employee.name)}>
+      {grant || signedRuntime ? (
+        <button className="contract-link" type="button" onClick={() => onOpenContract(employee)}>
           View contract <ArrowUpRight size={13} />
         </button>
+      ) : pendingCount > 0 ? (
+        <span className="status-label status-pending">Pending signature</span>
       ) : (
         <span className="no-contract">No grant</span>
+      )}
+      {pendingCount > 0 && (grant || signedRuntime) && (
+        <span className="status-label status-pending pending-inline">+{pendingCount} pending</span>
       )}
     </div>
   );
 }
 
-function EmployeeTable({ employees, emptyMessage, onViewContract }: { employees: Employee[]; emptyMessage: string; onViewContract: (name: string) => void }) {
+function EmployeeTable({ employees, emptyMessage, onOpenContract }: { employees: Employee[]; emptyMessage: string; onOpenContract: (employee: Employee) => void }) {
   if (employees.length === 0) {
     return <p className="empty-state">{emptyMessage}</p>;
   }
@@ -102,7 +115,7 @@ function EmployeeTable({ employees, emptyMessage, onViewContract }: { employees:
         <span>Contract</span>
       </div>
       {employees.map((employee) => (
-        <EmployeeRow key={employee.id} employee={employee} onViewContract={onViewContract} />
+        <EmployeeRow key={employee.id} employee={employee} onOpenContract={onOpenContract} />
       ))}
     </>
   );
@@ -111,11 +124,13 @@ function EmployeeTable({ employees, emptyMessage, onViewContract }: { employees:
 export function EmployeeListPage() {
   const llc = getLLCDetails(LLC_ID);
   const owner = llc ? getAuthorizedUser(llc.id) : null;
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sort, setSort] = useState<SortState>({ field: "name", direction: "asc" });
   const [showFormer, setShowFormer] = useState(false);
-  const [contractNotice, setContractNotice] = useState<string | null>(null);
+  const [wizardOpen, setWizardOpen] = useState(false);
+  useGrantStore();
 
   const employees = useMemo(() => (llc ? getEmployeesByLLC(llc.id) : []), [llc]);
 
@@ -132,7 +147,17 @@ export function EmployeeListPage() {
   const totalUnits = granted.reduce((sum, e) => sum + (e.grant?.unitsAwarded ?? 0), 0);
   const totalPayout = granted.reduce((sum, e) => sum + (e.grant?.currentPayoutValue ?? 0), 0);
 
-  const openContractNotice = (name: string) => setContractNotice(`Contract documents for ${name} are coming soon — the attorney-drafted agreement template is still in review.`);
+  const openContract = (employee: Employee) => {
+    const runtimeGrants = getGrantsForEmployee(employee.id);
+    const signedRuntime = runtimeGrants.find((g) => g.status === "active");
+    if (employee.grant) {
+      navigate(`/contracts/seeded-${employee.id}`);
+    } else if (signedRuntime) {
+      navigate(`/contracts/${signedRuntime.id}`);
+    } else {
+      navigate(`/employees/${employee.id}`);
+    }
+  };
 
   if (!llc) {
     return (
@@ -154,7 +179,12 @@ export function EmployeeListPage() {
             <h1>Employees</h1>
             <p>Click any employee to view their grant and vesting details.</p>
           </div>
-          <span className="mock-badge">Mock data</span>
+          <div className="page-intro-actions">
+            <button className="button-primary" type="button" onClick={() => setWizardOpen(true)}>
+              New grant
+            </button>
+            <span className="mock-badge">Mock data</span>
+          </div>
         </div>
 
         <section className="stat-card-row">
@@ -217,10 +247,10 @@ export function EmployeeListPage() {
           </div>
 
           {statusFilter === "former" ? (
-            <EmployeeTable employees={former} emptyMessage="No former employees match." onViewContract={openContractNotice} />
+            <EmployeeTable employees={former} emptyMessage="No former employees match." onOpenContract={openContract} />
           ) : (
             <>
-              <EmployeeTable employees={active} emptyMessage="No active employees match." onViewContract={openContractNotice} />
+              <EmployeeTable employees={active} emptyMessage="No active employees match." onOpenContract={openContract} />
               {former.length > 0 && (
                 <button className="former-toggle" type="button" onClick={() => setShowFormer((v) => !v)}>
                   <ChevronDown size={15} className={showFormer ? "chevron-open" : ""} />
@@ -228,18 +258,13 @@ export function EmployeeListPage() {
                 </button>
               )}
               {showFormer && (
-                <EmployeeTable employees={former} emptyMessage="No former employees match." onViewContract={openContractNotice} />
+                <EmployeeTable employees={former} emptyMessage="No former employees match." onOpenContract={openContract} />
               )}
             </>
           )}
         </section>
 
-        {contractNotice && (
-          <div className="contract-notice" role="status">
-            {contractNotice}
-            <button type="button" onClick={() => setContractNotice(null)}>Dismiss</button>
-          </div>
-        )}
+        {wizardOpen && <GrantWizard llcId={llc.id} onClose={() => setWizardOpen(false)} />}
       </div>
     </AppShell>
   );
