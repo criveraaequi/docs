@@ -218,6 +218,7 @@ export function VestingScheduleEditor({ units, schedule, onChange }: VestingSche
   const [useCustomCliff, setUseCustomCliff] = useState(false);
   const [triggersOpen, setTriggersOpen] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [showPercent, setShowPercent] = useState(false);
   const [drag, setDrag] = useState<DragState | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
@@ -238,12 +239,23 @@ export function VestingScheduleEditor({ units, schedule, onChange }: VestingSche
   const plotHeight = PLOT_BOTTOM - PLOT_TOP;
   const pxPerMonth = plotWidth / lengthMonths;
   const x = (month: number) => PLOT_LEFT + (month / lengthMonths) * plotWidth;
-  const y = (value: number) => PLOT_TOP + (1 - value / Math.max(units, 1)) * plotHeight;
+  const y = (value: number) => PLOT_TOP + (1 - value / 100) * plotHeight;
   const yPace = (pace: number) => PLOT_TOP + (1 - clamp(pace, 0, 1)) * plotHeight;
 
   const previewSeries = useMemo(
     () => buildVestingPreview(units, lengthMonths, cliffMonths, triggers, slowdowns),
     [units, lengthMonths, cliffMonths, triggers, slowdowns]
+  );
+  // The chart always plots a 0–100 domain: units mode normalizes the curve
+  // against the award size so both modes share one axis and one set of hinges.
+  const chartSeries = useMemo(
+    () =>
+      previewSeries.map((point) => ({
+        ...point,
+        vestedUnits:
+          units > 0 ? Math.min((point.vestedUnits / units) * 100, 100) : 0,
+      })),
+    [previewSeries, units]
   );
   const activeSlowdowns = activeSlowdownsOf(schedule);
   const totalTriggerPercent = Math.min(
@@ -623,9 +635,27 @@ export function VestingScheduleEditor({ units, schedule, onChange }: VestingSche
         </div>
       )}
       <div className="card wizard-vesting-chart">
+        <div className="chart-scale-toggle">
+          <button
+            type="button"
+            className={`scale-toggle${showPercent ? "" : " is-on"}`}
+            aria-pressed={!showPercent}
+            onClick={() => setShowPercent(false)}
+          >
+            Units
+          </button>
+          <button
+            type="button"
+            className={`scale-toggle${showPercent ? " is-on" : ""}`}
+            aria-pressed={showPercent}
+            onClick={() => setShowPercent(true)}
+          >
+            % vested
+          </button>
+        </div>
         <div className="chart-wrap" ref={wrapRef}>
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={previewSeries} margin={{ top: 24, right: 16, left: 4, bottom: 4 }}>
+            <AreaChart data={chartSeries} margin={{ top: 24, right: 16, left: 4, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(138, 147, 163, .18)" vertical={false} />
               <XAxis
                 dataKey="month"
@@ -642,8 +672,10 @@ export function VestingScheduleEditor({ units, schedule, onChange }: VestingSche
                 tickLine={false}
                 axisLine={false}
                 width={58}
-                domain={[0, Math.max(units, 1)]}
-                tickFormatter={(value: number) => value.toLocaleString()}
+                domain={[0, 100]}
+                tickFormatter={(value: number) =>
+                  showPercent ? `${value}%` : `${Math.round((value / 100) * units).toLocaleString()}`
+                }
               />
               <Tooltip
                 cursor={{ stroke: "rgba(138, 147, 163, .35)" }}
@@ -653,7 +685,11 @@ export function VestingScheduleEditor({ units, schedule, onChange }: VestingSche
                   background: "#fdfcf9",
                   fontFamily: "Work Sans",
                 }}
-                formatter={(value: unknown) => [`${Number(value).toLocaleString()} units`, "Vested units"]}
+                formatter={(value: unknown) =>
+                  showPercent
+                    ? [`${Number(value)}% of award`, "Vested"]
+                    : [`${Number(value).toLocaleString()} units`, "Vested units"]
+                }
                 labelFormatter={(label: unknown) => monthLabel(Number(label))}
               />
               <ReferenceLine
@@ -723,15 +759,15 @@ export function VestingScheduleEditor({ units, schedule, onChange }: VestingSche
                     </div>
                   );
                 })}
-              {cliffMonths > 0 && previewSeries[cliffMonths] && (
+              {cliffMonths > 0 && chartSeries[cliffMonths] && (
                 <div
                   className="hinge-cliff"
-                  style={{ left: x(cliffMonths), top: y(previewSeries[cliffMonths].vestedUnits) }}
+                  style={{ left: x(cliffMonths), top: y(chartSeries[cliffMonths].vestedUnits) }}
                   title="Cliff — set with the buttons above (fixed)"
                 />
               )}
               {triggers.map((trigger, index) => {
-                const point = previewSeries[trigger.atMonth];
+                const point = chartSeries[trigger.atMonth];
                 if (!point) return null;
                 return (
                   <button
@@ -798,7 +834,7 @@ export function VestingScheduleEditor({ units, schedule, onChange }: VestingSche
           <span><i className="legend-swatch is-cliff" /> Cliff — fixed by buttons</span>
         </div>
         <p className="wizard-hint">
-          Projected vesting for {units > 0 ? units.toLocaleString() : "—"} units · {lengthMonths}{" "}
+          Projected vesting {showPercent ? "as % of award" : `for ${units > 0 ? units.toLocaleString() : "—"} units`} · {lengthMonths}{" "}
           months with a {cliffMonths}-month cliff.
           {triggers.filter((trigger) => trigger.percentOfAward > 0).length > 0 &&
             ` ${triggers.filter((trigger) => trigger.percentOfAward > 0).length} trigger(s) applied.`}

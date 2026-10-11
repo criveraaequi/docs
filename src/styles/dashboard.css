@@ -369,6 +369,12 @@
   display: flex; flex-wrap: wrap; gap: 8px 18px; justify-content: center;
   margin-top: 10px; font-size: 0.74rem; color: #8a93a3;
 }
+.chart-scale-toggle {
+  display: flex; gap: 6px; justify-content: flex-end; margin-bottom: 8px;
+}
+.chart-scale-toggle .scale-toggle.is-on {
+  background: var(--navy); color: var(--card); border-color: var(--navy);
+}
 .hinge-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .legend-swatch { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 .legend-swatch.is-trigger { background: #1f3164; }
