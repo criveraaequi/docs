@@ -267,13 +267,15 @@ export async function createGrant(input: {
   unitsAwarded: number;
   strikePricePerUnit: number;
   scheduleLengthMonths: number;
+  cliffMonths?: number;
 }): Promise<GrantRecord> {
   const employee = mockEmployees.find((emp) => emp.id === input.employeeId);
   if (!employee) throw new Error("Employee not found");
 
   const grantDate = todayIso();
+  const cliffMonths = Math.min(input.cliffMonths ?? 12, Math.max(input.scheduleLengthMonths - 1, 1));
   const cliff = new Date(grantDate);
-  cliff.setFullYear(cliff.getFullYear() + 1);
+  cliff.setMonth(cliff.getMonth() + cliffMonths);
   const completion = new Date(grantDate);
   completion.setMonth(completion.getMonth() + input.scheduleLengthMonths);
 
@@ -288,7 +290,7 @@ export async function createGrant(input: {
     schedule_length_months: input.scheduleLengthMonths,
     cliff_date: cliff.toISOString().slice(0, 10),
     vesting_completion_date: completion.toISOString().slice(0, 10),
-    monthly_vesting_rate: input.unitsAwarded / Math.max(input.scheduleLengthMonths - 12, 1),
+    monthly_vesting_rate: input.unitsAwarded / Math.max(input.scheduleLengthMonths - cliffMonths, 1),
     contract_document_name: `Aequi_Grant_${employee.name.replace(/\s+/g, "_")}_${grantDate.replace(/-/g, "")}.pdf`,
     status: "pending" as const,
   };

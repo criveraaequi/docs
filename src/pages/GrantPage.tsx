@@ -4,6 +4,16 @@
 import { ArrowLeft, ArrowRight, Check, Search, Users } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { ContractDocument } from "@/components/ContractDocument";
 import { formatDate } from "@/components/ValuationDetailModal";
 import {
@@ -22,6 +32,35 @@ interface GrantPageProps {
 }
 
 const LENGTH_OPTIONS = [24, 36, 48];
+const CLIFF_OPTIONS = [6, 12, 24];
+
+interface VestingPreviewPoint {
+  label: string;
+  vestedUnits: number;
+  isCliff: boolean;
+}
+
+function buildVestingPreview(
+  units: number,
+  lengthMonths: number,
+  cliffMonths: number
+): VestingPreviewPoint[] {
+  const rate = units / Math.max(lengthMonths - cliffMonths, 1);
+  const points: VestingPreviewPoint[] = [];
+  for (let month = 0; month <= lengthMonths; month += 1) {
+    const date = new Date();
+    date.setMonth(date.getMonth() + month);
+    const vestedUnits = month < cliffMonths
+      ? 0
+      : Math.min(Math.round(month * rate), units);
+    points.push({
+      label: date.toLocaleDateString("en-US", { month: "short", year: "2-digit" }),
+      vestedUnits,
+      isCliff: month === cliffMonths,
+    });
+  }
+  return points;
+}
 
 type SortMode = "ungranted" | "mostEquity";
 
@@ -44,6 +83,8 @@ export function GrantPage({ llcId }: GrantPageProps) {
   const [units, setUnits] = useState<string>("");
   const [lengthMonths, setLengthMonths] = useState<number>(36);
   const [useCustomLength, setUseCustomLength] = useState(false);
+  const [cliffMonths, setCliffMonths] = useState<number>(12);
+  const [useCustomCliff, setUseCustomCliff] = useState(false);
   const [submitted, setSubmitted] = useState<GrantRecord | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -88,16 +129,22 @@ export function GrantPage({ llcId }: GrantPageProps) {
   const unitsOverPool = remainingUnits - unitCount < 0;
   const canContinueStep2 = unitCount > 0 && !unitsOverPool;
 
+  const cliffOverLength = cliffMonths >= lengthMonths;
   const cliffDate = useMemo(() => {
     const date = new Date();
-    date.setFullYear(date.getFullYear() + 1);
+    date.setMonth(date.getMonth() + cliffMonths);
     return date.toISOString().slice(0, 10);
-  }, []);
+  }, [cliffMonths]);
   const completionDate = useMemo(() => {
     const date = new Date();
     date.setMonth(date.getMonth() + lengthMonths);
     return date.toISOString().slice(0, 10);
   }, [lengthMonths]);
+  const vestingPreviewSeries = useMemo(
+    () => buildVestingPreview(unitCount, lengthMonths, cliffMonths),
+    [unitCount, lengthMonths, cliffMonths]
+  );
+  const cliffPreviewPoint = vestingPreviewSeries.find((point) => point.isCliff);
 
   async function handleSubmit() {
     if (!selectedEmployee) return;
@@ -109,6 +156,7 @@ export function GrantPage({ llcId }: GrantPageProps) {
         unitsAwarded: unitCount,
         strikePricePerUnit: strikePrice,
         scheduleLengthMonths: lengthMonths,
+        cliffMonths,
       });
       setSubmitted(grant);
     } catch (submitError) {
@@ -291,8 +339,8 @@ export function GrantPage({ llcId }: GrantPageProps) {
             <div className="wizard-field-block">
               <span className="wizard-field-label">Vesting schedule</span>
               <p className="wizard-hint">
-                Standard schedule: 1-year cliff, then monthly vesting. Only the total length can be
-                changed in the closed beta.
+                Set the total length and the cliff. Nothing vests before the cliff; after it,
+                units vest monthly until the schedule completes.
               </p>
               <div className="wizard-length-options">
                 {LENGTH_OPTIONS.map((months) => (
@@ -327,14 +375,104 @@ export function GrantPage({ llcId }: GrantPageProps) {
                 </div>
               </div>
             </div>
+            <div className="wizard-field-block">
+              <span className="wizard-field-label">Cliff</span>
+              <div className="wizard-length-options">
+                {CLIFF_OPTIONS.map((months) => (
+                  <button
+                    key={months}
+                    type="button"
+                    className={`wizard-length-option${!useCustomCliff && cliffMonths === months ? " is-selected" : ""}`}
+                    onClick={() => {
+                      setCliffMonths(months);
+                      setUseCustomCliff(false);
+                    }}
+                  >
+                    <strong>{months} months</strong>
+                    <span>{(months / 12).toFixed(months % 12 === 0 ? 0 : 1)} years</span>
+                  </button>
+                ))}
+                <div className={`wizard-length-option wizard-length-custom${useCustomCliff ? " is-selected" : ""}`}>
+                  <strong>Custom</strong>
+                  <input
+                    type="number"
+                    min={1}
+                    max={lengthMonths - 1}
+                    placeholder="Months"
+                    value={useCustomCliff ? cliffMonths : ""}
+                    onFocus={() => setUseCustomCliff(true)}
+                    onChange={(event) => {
+                      setUseCustomCliff(true);
+                      const value = Number(event.target.value);
+                      if (value >= 1 && value < lengthMonths) setCliffMonths(value);
+                    }}
+                  />
+                </div>
+              </div>
+              {cliffOverLength && (
+                <p className="wizard-error">
+                  The cliff must end before the vesting schedule does ({lengthMonths} months).
+                </p>
+              )}
+            </div>
             <div className="wizard-dates">
               <div><span>Grant date</span><strong>{formatDate(todayIso())}</strong></div>
               <div><span>Cliff date</span><strong>{formatDate(cliffDate)}</strong></div>
               <div><span>Fully vested</span><strong>{formatDate(completionDate)}</strong></div>
             </div>
+            <div className="card wizard-vesting-chart">
+              <div className="chart-wrap">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={vestingPreviewSeries} margin={{ top: 24, right: 16, left: 4, bottom: 4 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(138, 147, 163, .18)" vertical={false} />
+                    <XAxis dataKey="label" tick={{ fill: "#8a93a3", fontSize: 11 }} tickLine={false} axisLine={false} minTickGap={28} />
+                    <YAxis
+                      tick={{ fill: "#8a93a3", fontSize: 11 }}
+                      tickLine={false}
+                      axisLine={false}
+                      width={58}
+                      domain={[0, Math.max(unitCount, 1)]}
+                      tickFormatter={(value: number) => value.toLocaleString()}
+                    />
+                    <Tooltip
+                      cursor={{ stroke: "rgba(138, 147, 163, .35)" }}
+                      contentStyle={{ border: "1px solid rgba(138, 147, 163, .25)", borderRadius: 5, background: "#fdfcf9", fontFamily: "Work Sans" }}
+                      formatter={(value: unknown) => [`${Number(value).toLocaleString()} units`, "Vested units"]}
+                      labelFormatter={(label: unknown) => String(label)}
+                    />
+                    {cliffPreviewPoint && (
+                      <ReferenceLine
+                        x={cliffPreviewPoint.label}
+                        stroke="#b07d3a"
+                        strokeDasharray="5 4"
+                        label={{ value: "CLIFF", position: "top", fill: "#b07d3a", fontSize: 10, letterSpacing: "0.08em" }}
+                      />
+                    )}
+                    <Area
+                      type="monotone"
+                      dataKey="vestedUnits"
+                      stroke="#1f3164"
+                      strokeWidth={2.5}
+                      fill="rgba(31, 49, 100, .1)"
+                      activeDot={{ r: 5, fill: "#1f3164", stroke: "#fdfcf9", strokeWidth: 2 }}
+                      dot={false}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+              <p className="wizard-hint">
+                Projected vesting for {unitCount > 0 ? unitCount.toLocaleString() : "—"} units ·
+                {" "}{lengthMonths} months with a {cliffMonths}-month cliff.
+              </p>
+            </div>
             <div className="wizard-actions">
               <button className="button-secondary" type="button" onClick={() => setStep(2)}>Back</button>
-              <button className="button-primary" type="button" onClick={() => setStep(4)}>
+              <button
+                className="button-primary"
+                type="button"
+                disabled={cliffOverLength}
+                onClick={() => setStep(4)}
+              >
                 Continue <ArrowRight size={15} />
               </button>
             </div>
@@ -349,7 +487,7 @@ export function GrantPage({ llcId }: GrantPageProps) {
               <div><span>Units</span><strong>{unitCount.toLocaleString()}</strong></div>
               <div><span>Share of pool</span><strong>{((unitCount / poolUnits) * 100).toFixed(1)}%</strong></div>
               <div><span>Unit price</span><strong>${strikePrice.toFixed(2)}</strong></div>
-              <div><span>Vesting</span><strong>{lengthMonths} months, 1-year cliff</strong></div>
+              <div><span>Vesting</span><strong>{lengthMonths} months, {cliffMonths}-month cliff</strong></div>
               <div><span>Grant date</span><strong>{formatDate(todayIso())}</strong></div>
               <div><span>Fully vested</span><strong>{formatDate(completionDate)}</strong></div>
             </div>
@@ -367,7 +505,7 @@ export function GrantPage({ llcId }: GrantPageProps) {
                   scheduleLengthMonths: lengthMonths,
                   cliffDate,
                   vestingCompletionDate: completionDate,
-                  monthlyVestingRate: unitCount / Math.max(lengthMonths - 12, 1),
+                  monthlyVestingRate: unitCount / Math.max(lengthMonths - cliffMonths, 1),
                   contractDocumentName: `Aequi_Grant_${selectedEmployee.name.replace(/\s+/g, "_")}_${todayIso().replace(/-/g, "")}.pdf`,
                   status: "pending",
                   signedAt: null,
