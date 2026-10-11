@@ -1,8 +1,7 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { AppShell } from "@/components/AppShell";
 import { EquityPoolSummary } from "@/components/EquityPoolSummary";
-import { GrantWizard } from "@/components/GrantWizard";
-import { PoolExpansionModal } from "@/components/PoolExpansionModal";
 import { ValuationDetailModal } from "@/components/ValuationDetailModal";
 import { ValuationSummary } from "@/components/ValuationSummary";
 import { useGrantStore } from "@/data/useGrantStore";
@@ -23,8 +22,7 @@ function getGreeting(): string {
 export function OwnerDashboard() {
   const llc = getLLCDetails(LLC_ID);
   const [selectedValuation, setSelectedValuation] = useState<ValuationEvent | null>(null);
-  const [wizardOpen, setWizardOpen] = useState(false);
-  const [expansionOpen, setExpansionOpen] = useState(false);
+  const navigate = useNavigate();
   useGrantStore();
 
   if (!llc) return <div className="page-state">LLC not found.</div>;
@@ -38,7 +36,7 @@ export function OwnerDashboard() {
       <div className="page-intro">
         <div><span className="eyebrow">Owner dashboard</span><h1>{getGreeting()}, {owner?.name.split(" ")[0] ?? "Owner"}.</h1></div>
         <div className="page-intro-actions">
-          <button className="button-primary" type="button" onClick={() => setWizardOpen(true)}>
+          <button className="button-primary" type="button" onClick={() => navigate("/grants/new")}>
             New grant
           </button>
           <span className="mock-badge">Mock data</span>
@@ -48,13 +46,10 @@ export function OwnerDashboard() {
         <EquityPoolSummary
           llc={llc}
           holders={holders}
-          onExpandPool={() => setExpansionOpen(true)}
         />
         <ValuationSummary llc={llc} analyst={analyst} onSelectValuation={setSelectedValuation} />
       </div>
       <ValuationDetailModal llc={llc} valuation={selectedValuation} analyst={analyst} onClose={() => setSelectedValuation(null)} />
-      {wizardOpen && <GrantWizard llcId={llc.id} onClose={() => setWizardOpen(false)} />}
-      {expansionOpen && <PoolExpansionModal llcId={llc.id} onClose={() => setExpansionOpen(false)} />}
     </AppShell>
   );
 }

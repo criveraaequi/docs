@@ -7,6 +7,8 @@ import { EmployeeListPage } from "@/pages/EmployeeListPage";
 import { EmployeeDetailPage } from "@/pages/EmployeeDetailPage";
 import { ContractsPage } from "@/pages/ContractsPage";
 import { ContractViewerPage } from "@/pages/ContractViewerPage";
+import { GrantPage } from "@/pages/GrantPage";
+import { PoolExpansionPage } from "@/pages/PoolExpansionPage";
 import "@/styles/global.css";
 import "@/styles/dashboard.css";
 
@@ -18,6 +20,8 @@ function App() {
     <Route path="/employees/:employeeId" element={<EmployeeDetailPage />} />
     <Route path="/contracts" element={<ContractsPage />} />
     <Route path="/contracts/:grantId" element={<ContractViewerPage />} />
+    <Route path="/grants/new" element={<GrantPage llcId="llc-1" />} />
+    <Route path="/pool/expand" element={<PoolExpansionPage llcId="llc-1" />} />
     <Route path="*" element={<OwnerDashboard />} />
   </Routes>;
 }

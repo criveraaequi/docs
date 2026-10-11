@@ -1,7 +1,9 @@
-// Aequi — Grant creation wizard (owner-facing).
-// Steps: employee picker -> units -> vesting -> review -> submitted.
+// Aequi — New equity grant page (owner-facing).
+// Full-page version of the grant flow. Steps: employee picker -> units ->
+// vesting -> review -> created confirmation.
 import { ArrowLeft, ArrowRight, Check, Search, Users } from "lucide-react";
 import { useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { ContractDocument } from "@/components/ContractDocument";
 import { formatDate } from "@/components/ValuationDetailModal";
 import {
@@ -15,16 +17,15 @@ import { getAuthorizedUser, getEmployeesByLLC, getLLCDetails, getLatestValuation
 import type { Employee } from "@/data/types";
 import { todayIso } from "@/data/vesting";
 
-interface GrantWizardProps {
+interface GrantPageProps {
   llcId: string;
-  onClose: () => void;
 }
 
 const LENGTH_OPTIONS = [24, 36, 48];
 
 type SortMode = "ungranted" | "mostEquity";
 
-export function GrantWizard({ llcId, onClose }: GrantWizardProps) {
+export function GrantPage({ llcId }: GrantPageProps) {
   const llc = getLLCDetails(llcId);
   const owner = llc ? getAuthorizedUser(llc.id) : null;
   const employees = getEmployeesByLLC(llcId);
@@ -34,6 +35,7 @@ export function GrantWizard({ llcId, onClose }: GrantWizardProps) {
   const poolUnits = Math.round((pool.equityPoolPercent / 100) * pool.totalUnitsAuthorized);
   const allocatedUnits = getPoolAllocatedUnits(llcId);
   const remainingUnits = Math.max(poolUnits - allocatedUnits, 0);
+  const navigate = useNavigate();
 
   const [step, setStep] = useState(1);
   const [search, setSearch] = useState("");
@@ -115,29 +117,13 @@ export function GrantWizard({ llcId, onClose }: GrantWizardProps) {
     }
   }
 
-  function reset() {
-    setStep(1);
-    setSearch("");
-    setSortMode("ungranted");
-    setSelectedEmployee(null);
-    setUnits("");
-    setLengthMonths(36);
-    setUseCustomLength(false);
-    setSubmitted(null);
-    setError(null);
-  }
-
-  function closeAfterSubmit() {
-    reset();
-    onClose();
-  }
-
   if (!llc) return null;
 
   if (submitted) {
     return (
-      <div className="wizard-overlay" role="dialog" aria-modal="true" aria-label="Grant created">
-        <div className="wizard-modal wizard-confirm">
+      <div className="flow-page">
+        <Link className="back-link" to="/"><ArrowLeft size={15} /> Back to dashboard</Link>
+        <section className="card flow-confirm-card">
           <div className="wizard-confirm-icon"><Check size={26} /></div>
           <h2>Grant created</h2>
           <p>
@@ -150,32 +136,33 @@ export function GrantWizard({ llcId, onClose }: GrantWizardProps) {
             Demo tip: use the "Simulate employee signing" button on the employee's page or the
             pending grants list to walk through the signature step.
           </p>
-          <div className="wizard-actions">
-            <button className="button-secondary" type="button" onClick={closeAfterSubmit}>
+          <div className="wizard-actions flow-confirm-actions">
+            <button className="button-primary" type="button" onClick={() => navigate("/")}>
               Done
             </button>
           </div>
-        </div>
+        </section>
       </div>
     );
   }
 
   return (
-    <div className="wizard-overlay" role="dialog" aria-modal="true" aria-label="Create equity grant">
-      <div className="wizard-modal">
-        <div className="wizard-header">
-          <div>
-            <span className="eyebrow">New equity grant · {llc.name}</span>
-            <h2>
-              {step === 1 && "Choose employee"}
-              {step === 2 && "Set units"}
-              {step === 3 && "Vesting schedule"}
-              {step === 4 && "Review & send"}
-            </h2>
-          </div>
-          <button className="wizard-close" type="button" aria-label="Close" onClick={onClose}>×</button>
-        </div>
+    <div className="flow-page">
+      <Link className="back-link" to="/"><ArrowLeft size={15} /> Back to dashboard</Link>
 
+      <div className="page-intro flow-intro">
+        <div>
+          <span className="eyebrow">New equity grant · {llc.name}</span>
+          <h1>
+            {step === 1 && "Choose employee"}
+            {step === 2 && "Set units"}
+            {step === 3 && "Vesting schedule"}
+            {step === 4 && "Review & send"}
+          </h1>
+        </div>
+      </div>
+
+      <section className="card flow-card">
         <div className="wizard-steps" aria-label={`Step ${step} of 4`}>
           {[1, 2, 3, 4].map((marker) => (
             <span
@@ -187,7 +174,7 @@ export function GrantWizard({ llcId, onClose }: GrantWizardProps) {
         </div>
 
         {step === 1 && (
-          <div className="wizard-body">
+          <div className="flow-body">
             <div className="wizard-controls">
               <label className="search-box">
                 <Search size={15} />
@@ -209,7 +196,7 @@ export function GrantWizard({ llcId, onClose }: GrantWizardProps) {
                 </select>
               </label>
             </div>
-            <div className="wizard-employee-list">
+            <div className="wizard-employee-list flow-employee-list">
               {sortedEmployees.length === 0 && (
                 <p className="empty-state">No employees match that search.</p>
               )}
@@ -241,7 +228,7 @@ export function GrantWizard({ llcId, onClose }: GrantWizardProps) {
         )}
 
         {step === 2 && selectedEmployee && (
-          <div className="wizard-body">
+          <div className="flow-body">
             <button className="wizard-back" type="button" onClick={() => setStep(1)}>
               <ArrowLeft size={14} /> {selectedEmployee.name}
             </button>
@@ -297,7 +284,7 @@ export function GrantWizard({ llcId, onClose }: GrantWizardProps) {
         )}
 
         {step === 3 && selectedEmployee && (
-          <div className="wizard-body">
+          <div className="flow-body">
             <button className="wizard-back" type="button" onClick={() => setStep(2)}>
               <ArrowLeft size={14} /> {unitCount.toLocaleString()} units
             </button>
@@ -355,7 +342,7 @@ export function GrantWizard({ llcId, onClose }: GrantWizardProps) {
         )}
 
         {step === 4 && selectedEmployee && (
-          <div className="wizard-body">
+          <div className="flow-body">
             <div className="wizard-review-grid">
               <div><span>Employee</span><strong>{selectedEmployee.name}</strong></div>
               <div><span>Role</span><strong>{selectedEmployee.roleOrPosition}</strong></div>
@@ -399,7 +386,7 @@ export function GrantWizard({ llcId, onClose }: GrantWizardProps) {
             </div>
           </div>
         )}
-      </div>
+      </section>
     </div>
   );
 }

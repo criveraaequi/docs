@@ -1,8 +1,10 @@
-// Aequi — Phantom pool expansion modal (owner-facing).
-// Flow: percent picker (presets + custom) with live units conversion note ->
-// verification passcode (placeholder "1234") -> submitted, pending approval.
-import { ShieldCheck } from "lucide-react";
+// Aequi — Expand phantom pool page (owner-facing).
+// Full-page version of the expansion flow: percent picker (presets + custom)
+// with live units conversion note -> verification passcode (placeholder
+// "1234") -> submitted, pending approval.
+import { ArrowLeft, ShieldCheck } from "lucide-react";
 import { useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
   createPoolExpansion,
   EXPANSION_PASSCODE,
@@ -10,19 +12,19 @@ import {
   type PoolExpansionRecord,
 } from "@/data/grantStore";
 
-interface PoolExpansionModalProps {
+interface PoolExpansionPageProps {
   llcId: string;
-  onClose: () => void;
 }
 
 function suggestedPresets(currentPercent: number): number[] {
   return [currentPercent + 2, currentPercent + 5, currentPercent + 10];
 }
 
-export function PoolExpansionModal({ llcId, onClose }: PoolExpansionModalProps) {
+export function PoolExpansionPage({ llcId }: PoolExpansionPageProps) {
   const pool = getEffectivePool(llcId);
   const currentPercent = pool.equityPoolPercent;
   const authorizedUnits = pool.totalUnitsAuthorized;
+  const navigate = useNavigate();
 
   const [percentChoice, setPercentChoice] = useState<number | null>(null);
   const [useCustom, setUseCustom] = useState(false);
@@ -53,18 +55,33 @@ export function PoolExpansionModal({ llcId, onClose }: PoolExpansionModalProps) 
   const presets = useMemo(() => suggestedPresets(currentPercent), [currentPercent]);
 
   return (
-    <div className="wizard-overlay" role="dialog" aria-modal="true" aria-label="Expand phantom pool">
-      <div className="wizard-modal wizard-expansion">
-        <div className="wizard-header">
-          <div>
-            <span className="eyebrow">Phantom equity pool · {llcId === "llc-1" ? "Summit HVAC Solutions LLC" : llcId}</span>
-            <h2>Expand phantom pool</h2>
-          </div>
-          <button className="wizard-close" type="button" aria-label="Close" onClick={onClose}>×</button>
+    <div className="flow-page">
+      <Link className="back-link" to="/"><ArrowLeft size={15} /> Back to dashboard</Link>
+
+      <div className="page-intro flow-intro">
+        <div>
+          <span className="eyebrow">Phantom equity pool · {llcId === "llc-1" ? "Summit HVAC Solutions LLC" : llcId}</span>
+          <h1>
+            {step === 1 && "Expand phantom pool"}
+            {step === 2 && "Verify & certify"}
+            {step === 3 && "Expansion submitted"}
+          </h1>
+        </div>
+      </div>
+
+      <section className="card flow-card">
+        <div className="wizard-steps" aria-label={`Step ${step} of 3`}>
+          {[1, 2, 3].map((marker) => (
+            <span
+              key={marker}
+              className={`wizard-step-dot${marker === step ? " is-active" : ""}${marker < step ? " is-done" : ""}`}
+            />
+          ))}
+          <span className="wizard-step-label">Step {step} of 3</span>
         </div>
 
         {step === 1 && (
-          <div className="wizard-body">
+          <div className="flow-body">
             <p className="wizard-hint">
               Your pool is currently <strong>{currentPercent}%</strong> of the company
               ({oldUnits.toLocaleString()} units). Choose a new percentage to expand it to.
@@ -110,7 +127,6 @@ export function PoolExpansionModal({ llcId, onClose }: PoolExpansionModalProps) 
                 : "Choose a percentage above your current one to see the conversion."}
             </p>
             <div className="wizard-actions">
-              <button className="button-secondary" type="button" onClick={onClose}>Cancel</button>
               <button
                 className="button-primary"
                 type="button"
@@ -124,7 +140,7 @@ export function PoolExpansionModal({ llcId, onClose }: PoolExpansionModalProps) 
         )}
 
         {step === 2 && (
-          <div className="wizard-body">
+          <div className="flow-body">
             <div className="expansion-verify-head">
               <ShieldCheck size={22} />
               <div>
@@ -169,7 +185,7 @@ export function PoolExpansionModal({ llcId, onClose }: PoolExpansionModalProps) 
         )}
 
         {step === 3 && submitted && (
-          <div className="wizard-body wizard-confirm-body">
+          <div className="flow-body wizard-confirm-body">
             <div className="wizard-confirm-icon"><ShieldCheck size={26} /></div>
             <h2>Expansion submitted</h2>
             <p>
@@ -182,12 +198,14 @@ export function PoolExpansionModal({ llcId, onClose }: PoolExpansionModalProps) 
               Demo tip: approve it from the pool card's pending-expansion notice to apply the new
               pool size, then return here to grant more units.
             </p>
-            <div className="wizard-actions">
-              <button className="button-primary" type="button" onClick={onClose}>Done</button>
+            <div className="wizard-actions flow-confirm-actions">
+              <button className="button-primary" type="button" onClick={() => navigate("/")}>
+                Done
+              </button>
             </div>
           </div>
         )}
-      </div>
+      </section>
     </div>
   );
 }

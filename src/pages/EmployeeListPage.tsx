@@ -2,7 +2,6 @@ import { ArrowLeft, ArrowUpRight, ChevronDown, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AppShell } from "@/components/AppShell";
-import { GrantWizard } from "@/components/GrantWizard";
 import { getGrantsForEmployee } from "@/data/grantStore";
 import { getAuthorizedUser, getEmployeesByLLC, getLLCDetails } from "@/data/mockApi";
 import { useGrantStore } from "@/data/useGrantStore";
@@ -129,7 +128,6 @@ export function EmployeeListPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sort, setSort] = useState<SortState>({ field: "name", direction: "asc" });
   const [showFormer, setShowFormer] = useState(false);
-  const [wizardOpen, setWizardOpen] = useState(false);
   useGrantStore();
 
   const employees = useMemo(() => (llc ? getEmployeesByLLC(llc.id) : []), [llc]);
@@ -180,7 +178,7 @@ export function EmployeeListPage() {
             <p>Click any employee to view their grant and vesting details.</p>
           </div>
           <div className="page-intro-actions">
-            <button className="button-primary" type="button" onClick={() => setWizardOpen(true)}>
+            <button className="button-primary" type="button" onClick={() => navigate("/grants/new")}>
               New grant
             </button>
             <span className="mock-badge">Mock data</span>
@@ -263,8 +261,6 @@ export function EmployeeListPage() {
             </>
           )}
         </section>
-
-        {wizardOpen && <GrantWizard llcId={llc.id} onClose={() => setWizardOpen(false)} />}
       </div>
     </AppShell>
   );

@@ -265,35 +265,15 @@
 .pool-expansion-note span { font-size: 0.76rem; color: #5c6b8a; }
 .pool-expansion-note .button-secondary { padding: 7px 12px; font-size: 0.78rem; white-space: nowrap; }
 
-/* --- Wizard ------------------------------------------------------------- */
+/* --- Flow pages (grant creation, pool expansion) --------------------------- */
 
-.wizard-overlay {
-  position: fixed; inset: 0; z-index: 60;
-  background: rgba(24, 30, 44, 0.55);
-  display: flex; align-items: center; justify-content: center;
-  padding: 24px; overflow-y: auto;
-  animation: wizard-fade 0.18s ease;
-}
-@keyframes wizard-fade { from { opacity: 0; } to { opacity: 1; } }
-
-.wizard-modal {
-  background: #fdfcf9; border-radius: 10px; width: 100%; max-width: 640px;
-  max-height: calc(100vh - 48px); overflow-y: auto;
-  box-shadow: 0 24px 64px rgba(24, 30, 44, 0.35);
-  animation: wizard-rise 0.22s ease;
-}
-@keyframes wizard-rise { from { transform: translateY(14px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-
-.wizard-header {
-  display: flex; align-items: flex-start; justify-content: space-between;
-  padding: 24px 28px 0;
-}
-.wizard-header h2 { font-size: 1.3rem; margin: 2px 0 0; color: #23272f; }
-.wizard-close {
-  background: none; border: none; cursor: pointer; color: #8a93a3;
-  font-size: 1.5rem; line-height: 1; padding: 4px 8px; border-radius: 4px;
-}
-.wizard-close:hover { color: #23272f; background: rgba(138, 147, 163, 0.12); }
+.flow-page { max-width: 1100px; margin: 0 auto; }
+.flow-intro { margin-bottom: 18px; }
+.flow-card { padding: 0 0 8px; }
+.flow-body { padding: 20px 28px 28px; }
+.flow-employee-list { max-height: none; }
+.flow-confirm-card { max-width: 560px; margin: 0 auto; text-align: center; padding: 40px 36px 32px; }
+.flow-confirm-actions { justify-content: center; }
 
 .wizard-steps { display: flex; align-items: center; gap: 8px; padding: 16px 28px 0; }
 .wizard-step-dot {
@@ -393,7 +373,6 @@
 }
 .wizard-contract-preview .contract-doc { transform-origin: top center; }
 
-.wizard-confirm { max-width: 460px; text-align: center; padding: 40px 36px 32px; }
 .wizard-confirm-icon {
   width: 52px; height: 52px; border-radius: 50%; margin: 0 auto 16px;
   background: rgba(74, 124, 89, 0.12); color: #4a7c59;
@@ -410,7 +389,6 @@
 
 /* --- Pool expansion ------------------------------------------------------ */
 
-.wizard-expansion { max-width: 560px; }
 .expansion-units-note {
   margin: 14px 0 0; padding: 12px 14px; border-radius: 6px;
   background: rgba(31, 49, 100, 0.05); color: #1f3164; font-size: 0.88rem; line-height: 1.5;
@@ -427,7 +405,7 @@
   position: absolute; right: 0; top: calc(100% + 10px); width: 300px; z-index: 50;
   background: #fdfcf9; border: 1px solid rgba(138, 147, 163, 0.3); border-radius: 10px;
   box-shadow: 0 16px 40px rgba(24, 30, 44, 0.18);
-  padding: 16px; animation: wizard-rise 0.18s ease;
+  padding: 16px; animation: confirm-pop 0.18s ease;
 }
 .restart-confirm p { margin: 0 0 12px; font-size: 0.84rem; color: #23272f; line-height: 1.5; }
 .restart-confirm .restart-error { color: #ad5f3e; font-size: 0.78rem; }
@@ -440,8 +418,9 @@
   position: absolute; right: 0; top: calc(100% + 10px); width: 340px; z-index: 50;
   background: #fdfcf9; border: 1px solid rgba(138, 147, 163, 0.3); border-radius: 10px;
   box-shadow: 0 16px 40px rgba(24, 30, 44, 0.18); overflow: hidden;
-  animation: wizard-rise 0.18s ease;
+  animation: confirm-pop 0.18s ease;
 }
+@keyframes confirm-pop { from { transform: translateY(6px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 .notification-panel-header {
   display: flex; justify-content: space-between; align-items: center;
   padding: 12px 16px; border-bottom: 1px solid rgba(138, 147, 163, 0.2);
@@ -541,6 +520,7 @@
 
 @media (max-width: 720px) {
   .wizard-review-grid { grid-template-columns: repeat(2, 1fr); }
+  .flow-body { padding: 16px 18px 22px; }
   .contract-signatures { grid-template-columns: 1fr; gap: 20px; }
   .contracts-table-header, .contracts-row { grid-template-columns: 1fr; gap: 4px; }
   .contracts-table-header { display: none; }

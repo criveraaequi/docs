@@ -13,7 +13,6 @@ import type { LLC, UnitHolderSegment } from "@/data/types";
 interface EquityPoolSummaryProps {
   llc: LLC;
   holders: UnitHolderSegment[];
-  onExpandPool?: () => void;
 }
 
 // Ordered so adjacent segments contrast in hue and lightness; the rank-1
@@ -46,7 +45,7 @@ interface Segment {
 
 const EXIT_MS = 300;
 
-export function EquityPoolSummary({ llc, holders, onExpandPool }: EquityPoolSummaryProps) {
+export function EquityPoolSummary({ llc, holders }: EquityPoolSummaryProps) {
   const [scale, setScale] = useState<BarScale>("company");
   const [consolidated, setConsolidated] = useState(false);
   const navigate = useNavigate();
@@ -355,11 +354,9 @@ export function EquityPoolSummary({ llc, holders, onExpandPool }: EquityPoolSumm
         )}
       </div>
       <div className="card-link-row">
-        {onExpandPool && (
-          <button className="card-link card-link-button" type="button" onClick={onExpandPool}>
-            Expand phantom pool <TrendingUp size={15} />
-          </button>
-        )}
+        <Link className="card-link" to="/pool/expand">
+          Expand phantom pool <TrendingUp size={15} />
+        </Link>
         <Link className="card-link" to="/employees">
           View full Employee List <ArrowUpRight size={15} />
         </Link>
