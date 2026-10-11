@@ -57,7 +57,7 @@ function buildVestingPreview(
       ? 0
       : Math.min(
           Math.round(
-            month * rate +
+            (month - cliffMonths) * rate +
               triggers.reduce(
                 (sum, trigger) => sum + (trigger.atMonth <= month ? units * trigger.percentOfAward / 100 : 0),
                 0
