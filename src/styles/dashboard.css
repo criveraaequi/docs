@@ -565,6 +565,7 @@
 /* --- Contracts page ------------------------------------------------------- */
 
 .contracts-card { padding: 8px 0; }
+.contracts-toolbar { display: flex; justify-content: flex-end; padding: 12px 24px 4px; }
 .contracts-table-header, .contracts-row {
   display: grid; grid-template-columns: 1.4fr 0.6fr 1.4fr; gap: 14px;
   padding: 12px 24px; align-items: center;
@@ -698,6 +699,7 @@
   .contract-signatures { grid-template-columns: 1fr; gap: 20px; }
   .contracts-table-header, .contracts-row { grid-template-columns: 1fr; gap: 4px; }
   .contracts-table-header { display: none; }
+  .contracts-toolbar { justify-content: flex-start; padding: 12px 16px 4px; }
   .notification-panel { width: min(340px, calc(100vw - 32px)); right: -60px; }
   .wizard-pool-status { gap: 16px; }
 }

@@ -1,4 +1,5 @@
 // Aequi — Contracts page: all signed grant agreements (seeded + runtime).
+import { useState } from "react";
 import { ArrowLeft, ArrowUpRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { AppShell } from "@/components/AppShell";
@@ -11,6 +12,26 @@ import { getAuthorizedUser, getLLCDetails } from "@/data/mockApi";
 import { useGrantStore } from "@/data/useGrantStore";
 
 const LLC_ID = "llc-1";
+
+type ContractSort = "date-earliest" | "alphabetical" | "size";
+
+const CONTRACT_SORT_OPTIONS: { label: string; value: ContractSort }[] = [
+  { label: "Earliest to latest issue date", value: "date-earliest" },
+  { label: "Alphabetical (A–Z)", value: "alphabetical" },
+  { label: "Largest contract size", value: "size" },
+];
+
+function sortContractEntries(entries: ContractEntry[], sort: ContractSort): ContractEntry[] {
+  const sorted = [...entries];
+  switch (sort) {
+    case "alphabetical":
+      return sorted.sort((a, b) => a.name.localeCompare(b.name));
+    case "size":
+      return sorted.sort((a, b) => b.units - a.units);
+    case "date-earliest":
+      return sorted.sort((a, b) => a.grantDate.localeCompare(b.grantDate));
+  }
+}
 
 interface ContractEntry {
   key: string;
@@ -25,6 +46,7 @@ interface ContractEntry {
 export function ContractsPage() {
   const llc = getLLCDetails(LLC_ID);
   const owner = llc ? getAuthorizedUser(llc.id) : null;
+  const [sort, setSort] = useState<ContractSort>("date-earliest");
   useGrantStore();
 
   if (!llc) {
@@ -62,9 +84,7 @@ export function ContractsPage() {
       contractId: grant.id,
     }));
 
-  const entries = [...seededEntries, ...runtimeEntries].sort((a, b) =>
-    b.grantDate.localeCompare(a.grantDate)
-  );
+  const entries = sortContractEntries([...seededEntries, ...runtimeEntries], sort);
 
   return (
     <AppShell llc={llc} owner={owner}>
@@ -84,6 +104,21 @@ export function ContractsPage() {
             <p className="empty-state">No signed contracts yet.</p>
           ) : (
             <>
+              <div className="contracts-toolbar">
+                <label className="sort-select">
+                  <span>Sort</span>
+                  <select
+                    value={sort}
+                    onChange={(event) => setSort(event.target.value as ContractSort)}
+                  >
+                    {CONTRACT_SORT_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
               <div className="contracts-table-header">
                 <span>Contract</span>
                 <span>Issued</span>
