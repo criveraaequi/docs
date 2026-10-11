@@ -80,39 +80,51 @@ function runtimeGrantToEquityGrant(record: GrantRecord): EquityGrant {
 }
 
 /**
- * Merge several schedules onto one calendar timeline: combined vested units
- * per month across all agreements, priced at the unit price in effect on
- * each date (held constant after the latest valuation).
+ * Merge several schedules onto one calendar timeline. Points are keyed by
+ * calendar month (not exact day, since agreements are issued on different
+ * days), and each agreement's cumulative vested units are carried forward so
+ * the combined line stays a true running total.
  */
 function buildCombinedSeries(grants: EquityGrant[], history: ValuationEvent[]): VestingPoint[] {
-  const byDate = new Map<string, VestingPoint>();
-  for (const grant of grants) {
+  const monthKeys = new Set<string>();
+  const perGrantMonths = grants.map((grant) => {
     const { vesting } = grant;
     const months = Math.max(fullMonthsBetween(vesting.grantDate, vesting.vestingCompletionDate), 1);
+    const vestedByMonth = new Map<string, number>();
     for (let month = 0; month <= months; month += 1) {
       const date = new Date(vesting.grantDate);
       date.setMonth(date.getMonth() + month);
-      const iso = date.toISOString().slice(0, 10);
-      const vested = vestedUnitsAsOf(grant, iso);
-      const existing = byDate.get(iso);
-      if (existing) existing.vestedUnits += vested;
-      else {
-        byDate.set(iso, {
-          label: date.toLocaleDateString("en-US", { month: "short", year: "2-digit" }),
-          dateIso: iso,
-          vestedUnits: vested,
-          vestedValue: 0,
-          isCliff: false,
-          isToday: false,
-        });
-      }
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+      vestedByMonth.set(key, vestedUnitsAsOf(grant, date.toISOString().slice(0, 10)));
+      monthKeys.add(key);
     }
+    return vestedByMonth;
+  });
+
+  const points: VestingPoint[] = [];
+  const carryForward = grants.map(() => 0);
+  for (const key of [...monthKeys].sort()) {
+    let combinedUnits = 0;
+    for (let i = 0; i < perGrantMonths.length; i += 1) {
+      const vested = perGrantMonths[i].get(key);
+      if (vested !== undefined) carryForward[i] = vested;
+      combinedUnits += carryForward[i];
+    }
+    const [year, month] = key.split("-").map(Number);
+    const date = new Date(year, month - 1, 1);
+    points.push({
+      label: date.toLocaleDateString("en-US", { month: "short", year: "2-digit" }),
+      dateIso: key,
+      vestedUnits: combinedUnits,
+      vestedValue: 0,
+      isCliff: false,
+      isToday: false,
+    });
   }
-  const sorted = [...byDate.values()].sort((a, b) => a.dateIso.localeCompare(b.dateIso));
-  for (const point of sorted) {
+  for (const point of points) {
     point.vestedValue = Math.round(point.vestedUnits * strikePriceAt(history, point.dateIso));
   }
-  return sorted;
+  return points;
 }
 
 function formatYears(months: number): string {
