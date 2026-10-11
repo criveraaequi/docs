@@ -142,7 +142,7 @@ export function EquityPoolSummary({ llc, holders }: EquityPoolSummaryProps) {
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scale, consolidated]);
+  }, [scale, consolidated, allocatedUnits, poolUnits]);
 
   const [noteText, setNoteText] = useState(
     `Bar is the full ${authorized.toLocaleString()}-unit company — holders shown as shares of the company.`
@@ -160,7 +160,7 @@ export function EquityPoolSummary({ llc, holders }: EquityPoolSummaryProps) {
     }, 200);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scale]);
+  }, [scale, poolUnits]);
 
   const barAriaHolders = consolidated
     ? [...visibleHolders, { label: "Others", percentOfPool: othersPercent }]

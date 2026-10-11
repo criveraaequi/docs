@@ -21,7 +21,7 @@ import {
   mockLLCs,
   mockPlatformAdmins,
 } from "./mockData";
-import { getEffectivePool } from "./grantStore";
+import { getEffectivePool, getGrantsForEmployee } from "./grantStore";
 import { employeeVestedPayout, employeeVestedUnits } from "./vesting";
 
 // ---------------------------------------------------------------------------
@@ -104,20 +104,28 @@ export function getTopUnitHolders(
   const effectivePool = getEffectivePool(llcId);
   const poolUnits = (effectivePool.equityPoolPercent / 100) * effectivePool.totalUnitsAuthorized;
   const employees = getEmployeeGrants(llcId)
-    .sort((a, b) => (b.grant?.unitsAwarded ?? 0) - (a.grant?.unitsAwarded ?? 0))
+    .map((employee) => {
+      // Seeded grant plus signed runtime grants for this employee.
+      const runtimeUnits = getGrantsForEmployee(employee.id)
+        .filter((grant) => grant.llcId === llcId && grant.status === "active")
+        .reduce((sum, grant) => sum + grant.unitsAwarded, 0);
+      return { employee, units: (employee.grant?.unitsAwarded ?? 0) + runtimeUnits };
+    })
+    .filter((entry) => entry.units > 0)
+    .sort((a, b) => b.units - a.units)
     .slice(0, limit);
   const topUnits = employees.reduce(
-    (total, employee) => total + (employee.grant?.unitsAwarded ?? 0),
+    (total, entry) => total + entry.units,
     0
   );
   const remainderUnits = Math.max(poolUnits - topUnits, 0);
 
-  const segments: UnitHolderSegment[] = employees.map((employee) => ({
+  const segments: UnitHolderSegment[] = employees.map(({ employee, units }) => ({
     label: employee.name,
     employeeId: employee.id,
     role: employee.roleOrPosition,
-    units: employee.grant?.unitsAwarded ?? 0,
-    percentOfPool: ((employee.grant?.unitsAwarded ?? 0) / poolUnits) * 100,
+    units,
+    percentOfPool: (units / poolUnits) * 100,
   }));
 
   if (remainderUnits > 0) {
