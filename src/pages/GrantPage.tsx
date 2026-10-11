@@ -1,21 +1,17 @@
 // Aequi — New equity grant page (owner-facing).
 // Full-page version of the grant flow. Steps: employee picker -> units ->
 // vesting -> review -> created confirmation.
-import { ArrowLeft, ArrowRight, Check, ChevronUp, Plus, Search, Users, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Search, Users } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  ReferenceLine,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { ContractDocument } from "@/components/ContractDocument";
-import type { VestingSlowdown, VestingTrigger } from "@/data/types";
+import {
+  VestingScheduleEditor,
+  activeSlowdownsOf,
+  scheduleDateFor,
+  scheduleHasErrors,
+  type VestingScheduleState,
+} from "@/components/VestingScheduleEditor";
 import { formatDate } from "@/components/ValuationDetailModal";
 import {
   createGrant,
@@ -30,67 +26,6 @@ import { todayIso } from "@/data/vesting";
 
 interface GrantPageProps {
   llcId: string;
-}
-
-const LENGTH_OPTIONS = [24, 36, 48];
-const CLIFF_OPTIONS = [6, 12, 24];
-
-interface VestingPreviewPoint {
-  label: string;
-  vestedUnits: number;
-  isCliff: boolean;
-  isTrigger: boolean;
-}
-
-function buildVestingPreview(
-  units: number,
-  lengthMonths: number,
-  cliffMonths: number,
-  triggers: VestingTrigger[],
-  slowdowns: VestingSlowdown[]
-): VestingPreviewPoint[] {
-  // Mirrors vestedUnitsAsOf in vesting.ts so the preview always matches the
-  // numbers saved with the grant: triggered chunks vest at their month, the
-  // remainder vests monthly at the slowest applicable pace, and slowdown
-  // shortfalls are recovered in later months (still 100% by the end date).
-  const triggerPercent = Math.min(
-    triggers.reduce((sum, trigger) => sum + (trigger.percentOfAward || 0), 0),
-    100
-  );
-  const monthlyUnits = (units * (100 - triggerPercent)) / 100;
-  const baseMonthlyRate = monthlyUnits / Math.max(lengthMonths - cliffMonths, 1);
-  const paceAt = (month: number) => {
-    let pace = 1;
-    for (const slowdown of slowdowns) {
-      if (month >= slowdown.fromMonth && month < slowdown.toMonth) {
-        pace = Math.min(pace, slowdown.paceMultiplier);
-      }
-    }
-    return pace;
-  };
-
-  const points: VestingPreviewPoint[] = [];
-  let vested = 0;
-  let recoveryDebt = 0;
-  for (let month = 0; month <= lengthMonths; month += 1) {
-    const date = new Date();
-    date.setMonth(date.getMonth() + month);
-    if (month >= cliffMonths) {
-      vested += (baseMonthlyRate + recoveryDebt) * paceAt(month);
-      recoveryDebt += baseMonthlyRate * (1 - paceAt(month));
-    }
-    const triggerUnits = triggers.reduce(
-      (sum, trigger) => sum + (trigger.atMonth <= month ? units * trigger.percentOfAward / 100 : 0),
-      0
-    );
-    points.push({
-      label: date.toLocaleDateString("en-US", { month: "short", year: "2-digit" }),
-      vestedUnits: Math.min(Math.round(vested + triggerUnits), units),
-      isCliff: month === cliffMonths,
-      isTrigger: triggers.some((trigger) => trigger.atMonth === month),
-    });
-  }
-  return points;
 }
 
 type SortMode = "ungranted" | "mostEquity";
@@ -112,13 +47,12 @@ export function GrantPage({ llcId }: GrantPageProps) {
   const [sortMode, setSortMode] = useState<SortMode>("ungranted");
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [units, setUnits] = useState<string>("");
-  const [lengthMonths, setLengthMonths] = useState<number>(36);
-  const [useCustomLength, setUseCustomLength] = useState(false);
-  const [cliffMonths, setCliffMonths] = useState<number>(12);
-  const [useCustomCliff, setUseCustomCliff] = useState(false);
-  const [triggersOpen, setTriggersOpen] = useState(false);
-  const [triggers, setTriggers] = useState<VestingTrigger[]>([]);
-  const [slowdowns, setSlowdowns] = useState<VestingSlowdown[]>([]);
+  const [schedule, setSchedule] = useState<VestingScheduleState>({
+    lengthMonths: 36,
+    cliffMonths: 12,
+    triggers: [],
+    slowdowns: [],
+  });
   const [submitted, setSubmitted] = useState<GrantRecord | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -163,33 +97,10 @@ export function GrantPage({ llcId }: GrantPageProps) {
   const unitsOverPool = remainingUnits - unitCount < 0;
   const canContinueStep2 = unitCount > 0 && !unitsOverPool;
 
-  const cliffOverLength = cliffMonths >= lengthMonths;
-  const cliffDate = useMemo(() => {
-    const date = new Date();
-    date.setMonth(date.getMonth() + cliffMonths);
-    return date.toISOString().slice(0, 10);
-  }, [cliffMonths]);
-  const completionDate = useMemo(() => {
-    const date = new Date();
-    date.setMonth(date.getMonth() + lengthMonths);
-    return date.toISOString().slice(0, 10);
-  }, [lengthMonths]);
-  const vestingPreviewSeries = useMemo(
-    () => buildVestingPreview(unitCount, lengthMonths, cliffMonths, triggers, slowdowns),
-    [unitCount, lengthMonths, cliffMonths, triggers, slowdowns]
-  );
-  const cliffPreviewPoint = vestingPreviewSeries.find((point) => point.isCliff);
-  const totalTriggerPercent = Math.min(
-    triggers.reduce((sum, trigger) => sum + (trigger.percentOfAward || 0), 0),
-    100
-  );
-  const activeSlowdowns = slowdowns.filter(
-    (slowdown) => slowdown.toMonth > slowdown.fromMonth && slowdown.paceMultiplier < 1
-  );
-  const slowdownOverSchedule = slowdowns.some(
-    (slowdown) => slowdown.toMonth > slowdown.fromMonth && slowdown.toMonth >= lengthMonths
-  );
-  const hasScheduleError = cliffOverLength || slowdownOverSchedule;
+  const cliffDate = scheduleDateFor(schedule.cliffMonths);
+  const completionDate = scheduleDateFor(schedule.lengthMonths);
+  const activeSlowdowns = activeSlowdownsOf(schedule);
+  const positiveTriggers = schedule.triggers.filter((trigger) => trigger.percentOfAward > 0);
 
   async function handleSubmit() {
     if (!selectedEmployee) return;
@@ -200,14 +111,14 @@ export function GrantPage({ llcId }: GrantPageProps) {
         employeeId: selectedEmployee.id,
         unitsAwarded: unitCount,
         strikePricePerUnit: strikePrice,
-        scheduleLengthMonths: lengthMonths,
-        cliffMonths,
-        vestingTriggers: triggers.filter(
+        scheduleLengthMonths: schedule.lengthMonths,
+        cliffMonths: schedule.cliffMonths,
+        vestingTriggers: schedule.triggers.filter(
           (trigger) => trigger.atMonth >= 1 && trigger.percentOfAward > 0
         ),
         vestingSlowdowns: activeSlowdowns.map((slowdown) => ({
-          fromMonth: Math.max(slowdown.fromMonth, cliffMonths),
-          toMonth: Math.min(slowdown.toMonth, lengthMonths),
+          fromMonth: Math.max(slowdown.fromMonth, schedule.cliffMonths),
+          toMonth: Math.min(slowdown.toMonth, schedule.lengthMonths),
           paceMultiplier: slowdown.paceMultiplier,
         })),
       });
@@ -389,334 +300,17 @@ export function GrantPage({ llcId }: GrantPageProps) {
             <button className="wizard-back" type="button" onClick={() => setStep(2)}>
               <ArrowLeft size={14} /> {unitCount.toLocaleString()} units
             </button>
-            <div className="wizard-field-block">
-              <span className="wizard-field-label">Vesting schedule</span>
-              <p className="wizard-hint">
-                Set the total length and the cliff. Nothing vests before the cliff; after it,
-                units vest monthly until the schedule completes.
-              </p>
-              <div className="wizard-length-options">
-                {LENGTH_OPTIONS.map((months) => (
-                  <button
-                    key={months}
-                    type="button"
-                    className={`wizard-length-option${!useCustomLength && lengthMonths === months ? " is-selected" : ""}`}
-                    onClick={() => {
-                      setLengthMonths(months);
-                      setUseCustomLength(false);
-                    }}
-                  >
-                    <strong>{months / 12} years</strong>
-                    <span>{months} months</span>
-                  </button>
-                ))}
-                <div className={`wizard-length-option wizard-length-custom${useCustomLength ? " is-selected" : ""}`}>
-                  <strong>Custom</strong>
-                  <input
-                    type="number"
-                    min={13}
-                    max={120}
-                    placeholder="Months"
-                    value={useCustomLength ? lengthMonths : ""}
-                    onFocus={() => setUseCustomLength(true)}
-                    onChange={(event) => {
-                      setUseCustomLength(true);
-                      const value = Number(event.target.value);
-                      if (value >= 13 && value <= 120) setLengthMonths(value);
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="wizard-field-block">
-              <span className="wizard-field-label">Cliff</span>
-              <div className="wizard-length-options">
-                {CLIFF_OPTIONS.map((months) => (
-                  <button
-                    key={months}
-                    type="button"
-                    className={`wizard-length-option${!useCustomCliff && cliffMonths === months ? " is-selected" : ""}`}
-                    onClick={() => {
-                      setCliffMonths(months);
-                      setUseCustomCliff(false);
-                    }}
-                  >
-                    <strong>{months} months</strong>
-                    <span>{(months / 12).toFixed(months % 12 === 0 ? 0 : 1)} years</span>
-                  </button>
-                ))}
-                <div className={`wizard-length-option wizard-length-custom${useCustomCliff ? " is-selected" : ""}`}>
-                  <strong>Custom</strong>
-                  <input
-                    type="number"
-                    min={1}
-                    max={lengthMonths - 1}
-                    placeholder="Months"
-                    value={useCustomCliff ? cliffMonths : ""}
-                    onFocus={() => setUseCustomCliff(true)}
-                    onChange={(event) => {
-                      setUseCustomCliff(true);
-                      const value = Number(event.target.value);
-                      if (value >= 1 && value < lengthMonths) setCliffMonths(value);
-                    }}
-                  />
-                </div>
-              </div>
-              {cliffOverLength && (
-                <p className="wizard-error">
-                  The cliff must end before the vesting schedule does ({lengthMonths} months).
-                </p>
-              )}
-            </div>
-            <div className="wizard-dates">
-              <div><span>Grant date</span><strong>{formatDate(todayIso())}</strong></div>
-              <div><span>Cliff date</span><strong>{formatDate(cliffDate)}</strong></div>
-              <div><span>Fully vested</span><strong>{formatDate(completionDate)}</strong></div>
-            </div>
-            {!triggersOpen ? (
-              <button
-                className="wizard-triggers-link"
-                type="button"
-                onClick={() => setTriggersOpen(true)}
-              >
-                Add post-vesting cliffs <Plus size={14} />
-              </button>
-            ) : (
-              <div className="wizard-field-block wizard-triggers-editor">
-                <div className="wizard-triggers-header">
-                  <span className="wizard-field-label">Post-vesting cliffs</span>
-                  <button
-                    className="wizard-triggers-collapse"
-                    type="button"
-                    onClick={() => setTriggersOpen(false)}
-                  >
-                    Hide <ChevronUp size={14} />
-                  </button>
-                </div>
-                <p className="wizard-hint">
-                  Optional. Each trigger vests a percent of the total award at a set month.
-                  The remainder keeps vesting monthly after the cliff.
-                </p>
-                {triggers.map((trigger, index) => (
-                  <div className="wizard-trigger-row" key={index}>
-                    <label>
-                      <span>Month</span>
-                      <input
-                        type="number"
-                        min={1}
-                        max={lengthMonths}
-                        value={trigger.atMonth || ""}
-                        onChange={(event) => {
-                          const value = Math.min(Number(event.target.value) || 0, lengthMonths);
-                          setTriggers((current) =>
-                            current.map((trigger, triggerIndex) =>
-                              triggerIndex === index ? { ...trigger, atMonth: value } : trigger
-                            )
-                          );
-                        }}
-                      />
-                    </label>
-                    <label>
-                      <span>Percent of award</span>
-                      <input
-                        type="number"
-                        min={1}
-                        max={100 - triggers.reduce((sum, trig, trigIndex) => trigIndex === index ? sum : sum + (trig.percentOfAward || 0), 0)}
-                        value={trigger.percentOfAward || ""}
-                        onChange={(event) => {
-                          const maxPercent = 100 - triggers.reduce((sum, trig, trigIndex) => trigIndex === index ? sum : sum + (trig.percentOfAward || 0), 0);
-                          const value = Math.min(Number(event.target.value) || 0, maxPercent);
-                          setTriggers((current) =>
-                            current.map((trigger, triggerIndex) =>
-                              triggerIndex === index ? { ...trigger, percentOfAward: value } : trigger
-                            )
-                          );
-                        }}
-                      />
-                    </label>
-                    <button
-                      className="wizard-trigger-remove"
-                      type="button"
-                      aria-label="Remove trigger"
-                      onClick={() =>
-                        setTriggers((current) => current.filter((_, triggerIndex) => triggerIndex !== index))
-                      }
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                ))}
-                <button
-                  className="wizard-triggers-add"
-                  type="button"
-                  disabled={totalTriggerPercent >= 100}
-                  onClick={() =>
-                    setTriggers((current) => [...current, { atMonth: cliffMonths + 6, percentOfAward: 0 }])
-                  }
-                >
-                  <Plus size={14} /> Add trigger
-                </button>
-                <div className="wizard-slowdowns-section">
-                  <span className="wizard-field-label">Slow down vesting</span>
-                  <p className="wizard-hint">
-                    Optional. Pick a window after the cliff and a pace — monthly vesting runs
-                    slower during the window, then catches up so the grant still finishes on
-                    the original fully-vested date. The window must end at least one month
-                    before the schedule ends.
-                  </p>
-                  {slowdowns.map((slowdown, index) => (
-                    <div className="wizard-trigger-row" key={index}>
-                      <label>
-                        <span>From month</span>
-                        <input
-                          type="number"
-                          min={cliffMonths + 1}
-                          max={lengthMonths - 1}
-                          value={slowdown.fromMonth || ""}
-                          onChange={(event) => {
-                            const value = Math.min(
-                              Math.max(Number(event.target.value) || 0, cliffMonths + 1),
-                              lengthMonths - 1
-                            );
-                            setSlowdowns((current) =>
-                              current.map((entry, entryIndex) =>
-                                entryIndex === index ? { ...entry, fromMonth: value } : entry
-                              )
-                            );
-                          }}
-                        />
-                      </label>
-                      <label>
-                        <span>To month</span>
-                        <input
-                          type="number"
-                          min={cliffMonths + 1}
-                          max={lengthMonths - 1}
-                          value={slowdown.toMonth || ""}
-                          onChange={(event) => {
-                            const value = Math.min(
-                              Math.max(Number(event.target.value) || 0, cliffMonths + 1),
-                              lengthMonths - 1
-                            );
-                            setSlowdowns((current) =>
-                              current.map((entry, entryIndex) =>
-                                entryIndex === index ? { ...entry, toMonth: value } : entry
-                              )
-                            );
-                          }}
-                        />
-                      </label>
-                      <label>
-                        <span>Pace</span>
-                        <select
-                          value={slowdown.paceMultiplier}
-                          onChange={(event) => {
-                            const value = Number(event.target.value);
-                            setSlowdowns((current) =>
-                              current.map((entry, entryIndex) =>
-                                entryIndex === index ? { ...entry, paceMultiplier: value } : entry
-                              )
-                            );
-                          }}
-                        >
-                          <option value={0.75}>75% speed</option>
-                          <option value={0.5}>Half speed</option>
-                          <option value={0.25}>Quarter speed</option>
-                          <option value={0}>Paused</option>
-                        </select>
-                      </label>
-                      <button
-                        className="wizard-trigger-remove"
-                        type="button"
-                        aria-label="Remove slowdown"
-                        onClick={() =>
-                          setSlowdowns((current) => current.filter((_, entryIndex) => entryIndex !== index))
-                        }
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-                  ))}
-                  {slowdownOverSchedule && (
-                    <p className="wizard-error">
-                      The slow window must end at least one month before the vesting schedule
-                      ends ({lengthMonths} months), so the missed vesting can be recovered.
-                    </p>
-                  )}
-                  <button
-                    className="wizard-triggers-add"
-                    type="button"
-                    onClick={() =>
-                      setSlowdowns((current) => [
-                        ...current,
-                        {
-                          fromMonth: Math.min(cliffMonths + 3, lengthMonths - 3),
-                          toMonth: Math.min(cliffMonths + 9, lengthMonths - 1),
-                          paceMultiplier: 0.5,
-                        },
-                      ])
-                    }
-                  >
-                    <Plus size={14} /> Add slow window
-                  </button>
-                </div>
-              </div>
-            )}
-            <div className="card wizard-vesting-chart">
-              <div className="chart-wrap">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={vestingPreviewSeries} margin={{ top: 24, right: 16, left: 4, bottom: 4 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(138, 147, 163, .18)" vertical={false} />
-                    <XAxis dataKey="label" tick={{ fill: "#8a93a3", fontSize: 11 }} tickLine={false} axisLine={false} minTickGap={28} />
-                    <YAxis
-                      tick={{ fill: "#8a93a3", fontSize: 11 }}
-                      tickLine={false}
-                      axisLine={false}
-                      width={58}
-                      domain={[0, Math.max(unitCount, 1)]}
-                      tickFormatter={(value: number) => value.toLocaleString()}
-                    />
-                    <Tooltip
-                      cursor={{ stroke: "rgba(138, 147, 163, .35)" }}
-                      contentStyle={{ border: "1px solid rgba(138, 147, 163, .25)", borderRadius: 5, background: "#fdfcf9", fontFamily: "Work Sans" }}
-                      formatter={(value: unknown) => [`${Number(value).toLocaleString()} units`, "Vested units"]}
-                      labelFormatter={(label: unknown) => String(label)}
-                    />
-                    {cliffPreviewPoint && (
-                      <ReferenceLine
-                        x={cliffPreviewPoint.label}
-                        stroke="#b07d3a"
-                        strokeDasharray="5 4"
-                        label={{ value: "CLIFF", position: "top", fill: "#b07d3a", fontSize: 10, letterSpacing: "0.08em" }}
-                      />
-                    )}
-                    <Area
-                      type="monotone"
-                      dataKey="vestedUnits"
-                      stroke="#1f3164"
-                      strokeWidth={2.5}
-                      fill="rgba(31, 49, 100, .1)"
-                      activeDot={{ r: 5, fill: "#1f3164", stroke: "#fdfcf9", strokeWidth: 2 }}
-                      dot={false}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-              <p className="wizard-hint">
-                Projected vesting for {unitCount > 0 ? unitCount.toLocaleString() : "—"} units ·
-                {" "}{lengthMonths} months with a {cliffMonths}-month cliff.
-                {triggers.filter((trigger) => trigger.percentOfAward > 0).length > 0 &&
-                  ` ${triggers.filter((trigger) => trigger.percentOfAward > 0).length} trigger(s) applied.`}
-                {activeSlowdowns.length > 0 &&
-                  ` ${activeSlowdowns.length} slow window(s) applied.`}
-              </p>
-            </div>
+            <VestingScheduleEditor
+              units={unitCount}
+              schedule={schedule}
+              onChange={setSchedule}
+            />
             <div className="wizard-actions">
               <button className="button-secondary" type="button" onClick={() => setStep(2)}>Back</button>
               <button
                 className="button-primary"
                 type="button"
-                disabled={hasScheduleError}
+                disabled={scheduleHasErrors(schedule)}
                 onClick={() => setStep(4)}
               >
                 Continue <ArrowRight size={15} />
@@ -733,7 +327,7 @@ export function GrantPage({ llcId }: GrantPageProps) {
               <div><span>Units</span><strong>{unitCount.toLocaleString()}</strong></div>
               <div><span>Share of pool</span><strong>{((unitCount / poolUnits) * 100).toFixed(1)}%</strong></div>
               <div><span>Unit price</span><strong>${strikePrice.toFixed(2)}</strong></div>
-              <div><span>Vesting</span><strong>{lengthMonths} months, {cliffMonths}-month cliff{triggers.filter((trigger) => trigger.percentOfAward > 0).length > 0 ? `, ${triggers.filter((trigger) => trigger.percentOfAward > 0).length} trigger(s)` : ""}{activeSlowdowns.length > 0 ? `, ${activeSlowdowns.length} slow window(s)` : ""}</strong></div>
+              <div><span>Vesting</span><strong>{schedule.lengthMonths} months, {schedule.cliffMonths}-month cliff{positiveTriggers.length > 0 ? `, ${positiveTriggers.length} trigger(s)` : ""}{activeSlowdowns.length > 0 ? `, ${activeSlowdowns.length} slow window(s)` : ""}</strong></div>
               <div><span>Grant date</span><strong>{formatDate(todayIso())}</strong></div>
               <div><span>Fully vested</span><strong>{formatDate(completionDate)}</strong></div>
             </div>
@@ -748,11 +342,11 @@ export function GrantPage({ llcId }: GrantPageProps) {
                   unitsAwarded: unitCount,
                   strikePricePerUnit: strikePrice,
                   grantDate: todayIso(),
-                  scheduleLengthMonths: lengthMonths,
+                  scheduleLengthMonths: schedule.lengthMonths,
                   cliffDate,
                   vestingCompletionDate: completionDate,
-                  monthlyVestingRate: unitCount / Math.max(lengthMonths - cliffMonths, 1),
-                  vestingTriggers: triggers,
+                  monthlyVestingRate: unitCount / Math.max(schedule.lengthMonths - schedule.cliffMonths, 1),
+                  vestingTriggers: schedule.triggers,
                   vestingSlowdowns: activeSlowdowns,
                   contractDocumentName: `Aequi_Grant_${selectedEmployee.name.replace(/\s+/g, "_")}_${todayIso().replace(/-/g, "")}.pdf`,
                   status: "pending",
