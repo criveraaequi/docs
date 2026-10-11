@@ -60,10 +60,29 @@ export function vestedUnitsAsOf(
     endIso = vesting.vestingCompletionDate;
   }
 
-  const monthsAfterCliff = fullMonthsBetween(vesting.cliffDate, endIso);
-  if (monthsAfterCliff <= 0) return 0;
-  const rate = unitsAwarded / Math.max(monthsBetween(grant.vesting.grantDate, grant.vesting.vestingCompletionDate) - monthsBetween(grant.vesting.grantDate, grant.vesting.cliffDate), 1);
-  return Math.min(Math.round(monthsAfterCliff * rate), unitsAwarded);
+  const cliffMonths = fullMonthsBetween(vesting.grantDate, vesting.cliffDate);
+  const monthsElapsed = fullMonthsBetween(vesting.grantDate, endIso);
+  if (monthsElapsed < cliffMonths) return 0;
+
+  const triggers = vesting.vestingTriggers ?? [];
+  const triggeredPercent = Math.min(
+    triggers.reduce((sum, trigger) => sum + trigger.percentOfAward, 0),
+    100
+  );
+  const remainderPercent = 100 - triggeredPercent;
+  const remainingMonths = Math.max(
+    monthsBetween(vesting.grantDate, vesting.vestingCompletionDate) - cliffMonths,
+    1
+  );
+
+  let vested = 0;
+  for (const trigger of triggers) {
+    if (trigger.atMonth <= monthsElapsed) {
+      vested += Math.round((unitsAwarded * trigger.percentOfAward) / 100);
+    }
+  }
+  vested += ((unitsAwarded * remainderPercent) / 100 / remainingMonths) * (monthsElapsed - cliffMonths);
+  return Math.min(Math.round(vested), unitsAwarded);
 }
 
 function monthsBetween(fromIso: string, toIso: string): number {

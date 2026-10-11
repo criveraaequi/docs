@@ -25,6 +25,7 @@ function seededGrantRecord(employeeId: string): GrantRecord | null {
     cliffDate: grant.vesting.cliffDate,
     vestingCompletionDate: grant.vesting.vestingCompletionDate,
     monthlyVestingRate: grant.vesting.monthlyVestingRate,
+    vestingTriggers: grant.vesting.vestingTriggers,
     contractDocumentName: grant.contractDocumentName,
     status: "active",
     signedAt: grant.grantDate,

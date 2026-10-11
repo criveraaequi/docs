@@ -11,7 +11,7 @@ import {
   mockLLCs,
 } from "./mockData";
 import { todayIso } from "./vesting";
-import type { Employee } from "./types";
+import type { Employee, VestingTrigger } from "./types";
 
 export type GrantStatus = "pending" | "active";
 
@@ -28,6 +28,7 @@ export interface GrantRecord {
   cliffDate: string;
   vestingCompletionDate: string;
   monthlyVestingRate: number;
+  vestingTriggers: VestingTrigger[];
   contractDocumentName: string;
   status: GrantStatus;
   signedAt: string | null;
@@ -73,6 +74,7 @@ interface GrantRow {
   cliff_date: string;
   vesting_completion_date: string;
   monthly_vesting_rate: number;
+  vesting_triggers: VestingTrigger[] | null;
   contract_document_name: string;
   status: string;
   signed_at: string | null;
@@ -115,6 +117,7 @@ function toGrantRecord(row: GrantRow): GrantRecord {
     cliffDate: row.cliff_date,
     vestingCompletionDate: row.vesting_completion_date,
     monthlyVestingRate: Number(row.monthly_vesting_rate),
+    vestingTriggers: row.vesting_triggers ?? [],
     contractDocumentName: row.contract_document_name,
     status: row.status as GrantStatus,
     signedAt: row.signed_at,
@@ -268,6 +271,7 @@ export async function createGrant(input: {
   strikePricePerUnit: number;
   scheduleLengthMonths: number;
   cliffMonths?: number;
+  vestingTriggers?: VestingTrigger[];
 }): Promise<GrantRecord> {
   const employee = mockEmployees.find((emp) => emp.id === input.employeeId);
   if (!employee) throw new Error("Employee not found");
@@ -291,6 +295,9 @@ export async function createGrant(input: {
     cliff_date: cliff.toISOString().slice(0, 10),
     vesting_completion_date: completion.toISOString().slice(0, 10),
     monthly_vesting_rate: input.unitsAwarded / Math.max(input.scheduleLengthMonths - cliffMonths, 1),
+    vesting_triggers: (input.vestingTriggers ?? []).filter(
+      (trigger) => trigger.atMonth >= 1 && trigger.percentOfAward > 0
+    ),
     contract_document_name: `Aequi_Grant_${employee.name.replace(/\s+/g, "_")}_${grantDate.replace(/-/g, "")}.pdf`,
     status: "pending" as const,
   };

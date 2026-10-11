@@ -54,6 +54,15 @@ export interface VestingSchedule {
   vestingCompletionDate: string; // ISO date — end of vesting
   scheduleLengthMonths: number; // total vesting period (owner may edit this only)
   monthlyVestingRate: number; // units vested per month after cliff
+  /** Owner-defined vesting triggers: percent of the award vested at a given month. */
+  vestingTriggers: VestingTrigger[];
+}
+
+export interface VestingTrigger {
+  /** Month of the schedule (counted from grant date) when the trigger fires. */
+  atMonth: number;
+  /** Percent (0–100) of the total award vested by this trigger. */
+  percentOfAward: number;
 }
 
 // ---------------------------------------------------------------------------

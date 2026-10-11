@@ -285,6 +285,45 @@
 .wizard-vesting-chart { margin-top: 18px; padding: 16px 16px 12px; }
 .wizard-vesting-chart .chart-wrap { height: 260px; }
 .wizard-vesting-chart .wizard-hint { text-align: center; }
+
+.wizard-triggers-link {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: 16px;
+  padding: 0; border: none; background: none; cursor: pointer;
+  font: 600 0.82rem/1 "Work Sans", sans-serif; color: #1f3164;
+}
+.wizard-triggers-link:hover { text-decoration: underline; }
+
+.wizard-triggers-editor { margin-top: 16px; }
+.wizard-triggers-header { display: flex; align-items: center; justify-content: space-between; }
+.wizard-triggers-collapse {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 0; border: none; background: none; cursor: pointer;
+  font: 600 0.76rem/1 "Work Sans", sans-serif; color: #8a93a3;
+}
+.wizard-triggers-collapse:hover { color: #1f3164; }
+
+.wizard-trigger-row { display: flex; align-items: flex-end; gap: 10px; margin-top: 10px; }
+.wizard-trigger-row label { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.wizard-trigger-row label span { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.04em; color: #8a93a3; }
+.wizard-trigger-row input {
+  border: 1px solid rgba(138, 147, 163, 0.4); border-radius: 6px; background: #fff;
+  padding: 8px 10px; font: 400 0.85rem/1.2 "Work Sans", sans-serif; color: #23272f;
+}
+.wizard-trigger-row input:focus { outline: none; border-color: #1f3164; box-shadow: 0 0 0 3px rgba(31, 49, 100, 0.12); }
+.wizard-trigger-remove {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; margin-bottom: 1px;
+  border: 1px solid rgba(138, 147, 163, 0.4); border-radius: 6px; background: none;
+  color: #8a93a3; cursor: pointer;
+}
+.wizard-trigger-remove:hover { color: #ad5f3e; border-color: rgba(173, 95, 62, 0.5); }
+
+.wizard-triggers-add {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: 12px;
+  padding: 0; border: none; background: none; cursor: pointer;
+  font: 600 0.82rem/1 "Work Sans", sans-serif; color: #1f3164;
+}
+.wizard-triggers-add:disabled { color: #b6bcc7; cursor: not-allowed; }
 .flow-confirm-card { max-width: 560px; margin: auto 0; text-align: center; padding: 40px 36px 32px; }
 .flow-confirm-actions { justify-content: center; }
 

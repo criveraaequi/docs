@@ -1,7 +1,7 @@
 // Aequi — New equity grant page (owner-facing).
 // Full-page version of the grant flow. Steps: employee picker -> units ->
 // vesting -> review -> created confirmation.
-import { ArrowLeft, ArrowRight, Check, Search, Users } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, ChevronUp, Plus, Search, Users, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -15,6 +15,7 @@ import {
   YAxis,
 } from "recharts";
 import { ContractDocument } from "@/components/ContractDocument";
+import type { VestingTrigger } from "@/data/types";
 import { formatDate } from "@/components/ValuationDetailModal";
 import {
   createGrant,
@@ -38,12 +39,14 @@ interface VestingPreviewPoint {
   label: string;
   vestedUnits: number;
   isCliff: boolean;
+  isTrigger: boolean;
 }
 
 function buildVestingPreview(
   units: number,
   lengthMonths: number,
-  cliffMonths: number
+  cliffMonths: number,
+  triggers: VestingTrigger[]
 ): VestingPreviewPoint[] {
   const rate = units / Math.max(lengthMonths - cliffMonths, 1);
   const points: VestingPreviewPoint[] = [];
@@ -52,11 +55,21 @@ function buildVestingPreview(
     date.setMonth(date.getMonth() + month);
     const vestedUnits = month < cliffMonths
       ? 0
-      : Math.min(Math.round(month * rate), units);
+      : Math.min(
+          Math.round(
+            month * rate +
+              triggers.reduce(
+                (sum, trigger) => sum + (trigger.atMonth <= month ? units * trigger.percentOfAward / 100 : 0),
+                0
+              )
+          ),
+          units
+        );
     points.push({
       label: date.toLocaleDateString("en-US", { month: "short", year: "2-digit" }),
       vestedUnits,
       isCliff: month === cliffMonths,
+      isTrigger: triggers.some((trigger) => trigger.atMonth === month),
     });
   }
   return points;
@@ -85,6 +98,8 @@ export function GrantPage({ llcId }: GrantPageProps) {
   const [useCustomLength, setUseCustomLength] = useState(false);
   const [cliffMonths, setCliffMonths] = useState<number>(12);
   const [useCustomCliff, setUseCustomCliff] = useState(false);
+  const [triggersOpen, setTriggersOpen] = useState(false);
+  const [triggers, setTriggers] = useState<VestingTrigger[]>([]);
   const [submitted, setSubmitted] = useState<GrantRecord | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -141,10 +156,14 @@ export function GrantPage({ llcId }: GrantPageProps) {
     return date.toISOString().slice(0, 10);
   }, [lengthMonths]);
   const vestingPreviewSeries = useMemo(
-    () => buildVestingPreview(unitCount, lengthMonths, cliffMonths),
-    [unitCount, lengthMonths, cliffMonths]
+    () => buildVestingPreview(unitCount, lengthMonths, cliffMonths, triggers),
+    [unitCount, lengthMonths, cliffMonths, triggers]
   );
   const cliffPreviewPoint = vestingPreviewSeries.find((point) => point.isCliff);
+  const totalTriggerPercent = Math.min(
+    triggers.reduce((sum, trigger) => sum + (trigger.percentOfAward || 0), 0),
+    100
+  );
 
   async function handleSubmit() {
     if (!selectedEmployee) return;
@@ -157,6 +176,9 @@ export function GrantPage({ llcId }: GrantPageProps) {
         strikePricePerUnit: strikePrice,
         scheduleLengthMonths: lengthMonths,
         cliffMonths,
+        vestingTriggers: triggers.filter(
+          (trigger) => trigger.atMonth >= 1 && trigger.percentOfAward > 0
+        ),
       });
       setSubmitted(grant);
     } catch (submitError) {
@@ -420,6 +442,91 @@ export function GrantPage({ llcId }: GrantPageProps) {
               <div><span>Cliff date</span><strong>{formatDate(cliffDate)}</strong></div>
               <div><span>Fully vested</span><strong>{formatDate(completionDate)}</strong></div>
             </div>
+            {!triggersOpen ? (
+              <button
+                className="wizard-triggers-link"
+                type="button"
+                onClick={() => setTriggersOpen(true)}
+              >
+                Add post-vesting cliffs <Plus size={14} />
+              </button>
+            ) : (
+              <div className="wizard-field-block wizard-triggers-editor">
+                <div className="wizard-triggers-header">
+                  <span className="wizard-field-label">Post-vesting cliffs</span>
+                  <button
+                    className="wizard-triggers-collapse"
+                    type="button"
+                    onClick={() => setTriggersOpen(false)}
+                  >
+                    Hide <ChevronUp size={14} />
+                  </button>
+                </div>
+                <p className="wizard-hint">
+                  Optional. Each trigger vests a percent of the total award at a set month.
+                  The remainder keeps vesting monthly after the cliff.
+                </p>
+                {triggers.map((trigger, index) => (
+                  <div className="wizard-trigger-row" key={index}>
+                    <label>
+                      <span>Month</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={lengthMonths}
+                        value={trigger.atMonth || ""}
+                        onChange={(event) => {
+                          const value = Math.min(Number(event.target.value) || 0, lengthMonths);
+                          setTriggers((current) =>
+                            current.map((trigger, triggerIndex) =>
+                              triggerIndex === index ? { ...trigger, atMonth: value } : trigger
+                            )
+                          );
+                        }}
+                      />
+                    </label>
+                    <label>
+                      <span>Percent of award</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={100 - triggers.reduce((sum, trig, trigIndex) => trigIndex === index ? sum : sum + (trig.percentOfAward || 0), 0)}
+                        value={trigger.percentOfAward || ""}
+                        onChange={(event) => {
+                          const maxPercent = 100 - triggers.reduce((sum, trig, trigIndex) => trigIndex === index ? sum : sum + (trig.percentOfAward || 0), 0);
+                          const value = Math.min(Number(event.target.value) || 0, maxPercent);
+                          setTriggers((current) =>
+                            current.map((trigger, triggerIndex) =>
+                              triggerIndex === index ? { ...trigger, percentOfAward: value } : trigger
+                            )
+                          );
+                        }}
+                      />
+                    </label>
+                    <button
+                      className="wizard-trigger-remove"
+                      type="button"
+                      aria-label="Remove trigger"
+                      onClick={() =>
+                        setTriggers((current) => current.filter((_, triggerIndex) => triggerIndex !== index))
+                      }
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+                <button
+                  className="wizard-triggers-add"
+                  type="button"
+                  disabled={totalTriggerPercent >= 100}
+                  onClick={() =>
+                    setTriggers((current) => [...current, { atMonth: cliffMonths + 6, percentOfAward: 0 }])
+                  }
+                >
+                  <Plus size={14} /> Add trigger
+                </button>
+              </div>
+            )}
             <div className="card wizard-vesting-chart">
               <div className="chart-wrap">
                 <ResponsiveContainer width="100%" height="100%">
@@ -463,6 +570,8 @@ export function GrantPage({ llcId }: GrantPageProps) {
               <p className="wizard-hint">
                 Projected vesting for {unitCount > 0 ? unitCount.toLocaleString() : "—"} units ·
                 {" "}{lengthMonths} months with a {cliffMonths}-month cliff.
+                {triggers.filter((trigger) => trigger.percentOfAward > 0).length > 0 &&
+                  ` ${triggers.filter((trigger) => trigger.percentOfAward > 0).length} trigger(s) applied.`}
               </p>
             </div>
             <div className="wizard-actions">
@@ -487,7 +596,7 @@ export function GrantPage({ llcId }: GrantPageProps) {
               <div><span>Units</span><strong>{unitCount.toLocaleString()}</strong></div>
               <div><span>Share of pool</span><strong>{((unitCount / poolUnits) * 100).toFixed(1)}%</strong></div>
               <div><span>Unit price</span><strong>${strikePrice.toFixed(2)}</strong></div>
-              <div><span>Vesting</span><strong>{lengthMonths} months, {cliffMonths}-month cliff</strong></div>
+              <div><span>Vesting</span><strong>{lengthMonths} months, {cliffMonths}-month cliff{triggers.filter((trigger) => trigger.percentOfAward > 0).length > 0 ? `, ${triggers.filter((trigger) => trigger.percentOfAward > 0).length} trigger(s)` : ""}</strong></div>
               <div><span>Grant date</span><strong>{formatDate(todayIso())}</strong></div>
               <div><span>Fully vested</span><strong>{formatDate(completionDate)}</strong></div>
             </div>
@@ -506,6 +615,7 @@ export function GrantPage({ llcId }: GrantPageProps) {
                   cliffDate,
                   vestingCompletionDate: completionDate,
                   monthlyVestingRate: unitCount / Math.max(lengthMonths - cliffMonths, 1),
+                  vestingTriggers: triggers,
                   contractDocumentName: `Aequi_Grant_${selectedEmployee.name.replace(/\s+/g, "_")}_${todayIso().replace(/-/g, "")}.pdf`,
                   status: "pending",
                   signedAt: null,
