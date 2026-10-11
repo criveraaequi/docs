@@ -56,6 +56,8 @@ export interface VestingSchedule {
   monthlyVestingRate: number; // units vested per month after cliff
   /** Owner-defined vesting triggers: percent of the award vested at a given month. */
   vestingTriggers: VestingTrigger[];
+  /** Owner-defined slowdown windows: reduced monthly pace after the cliff. */
+  vestingSlowdowns: VestingSlowdown[];
 }
 
 export interface VestingTrigger {
@@ -63,6 +65,15 @@ export interface VestingTrigger {
   atMonth: number;
   /** Percent (0–100) of the total award vested by this trigger. */
   percentOfAward: number;
+}
+
+export interface VestingSlowdown {
+  /** First month of the window, counted from the grant date (inclusive). */
+  fromMonth: number;
+  /** Month after the last slowed month (exclusive). */
+  toMonth: number;
+  /** Pace multiplier during the window: 0 = paused, 0.5 = half speed. */
+  paceMultiplier: number;
 }
 
 // ---------------------------------------------------------------------------

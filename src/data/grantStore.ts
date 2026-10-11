@@ -11,7 +11,7 @@ import {
   mockLLCs,
 } from "./mockData";
 import { todayIso } from "./vesting";
-import type { Employee, VestingTrigger } from "./types";
+import type { Employee, VestingSlowdown, VestingTrigger } from "./types";
 
 export type GrantStatus = "pending" | "active";
 
@@ -29,6 +29,7 @@ export interface GrantRecord {
   vestingCompletionDate: string;
   monthlyVestingRate: number;
   vestingTriggers: VestingTrigger[];
+  vestingSlowdowns: VestingSlowdown[];
   contractDocumentName: string;
   status: GrantStatus;
   signedAt: string | null;
@@ -75,6 +76,7 @@ interface GrantRow {
   vesting_completion_date: string;
   monthly_vesting_rate: number;
   vesting_triggers: VestingTrigger[] | null;
+  vesting_slowdowns: VestingSlowdown[] | null;
   contract_document_name: string;
   status: string;
   signed_at: string | null;
@@ -118,6 +120,7 @@ function toGrantRecord(row: GrantRow): GrantRecord {
     vestingCompletionDate: row.vesting_completion_date,
     monthlyVestingRate: Number(row.monthly_vesting_rate),
     vestingTriggers: row.vesting_triggers ?? [],
+    vestingSlowdowns: row.vesting_slowdowns ?? [],
     contractDocumentName: row.contract_document_name,
     status: row.status as GrantStatus,
     signedAt: row.signed_at,
@@ -272,6 +275,7 @@ export async function createGrant(input: {
   scheduleLengthMonths: number;
   cliffMonths?: number;
   vestingTriggers?: VestingTrigger[];
+  vestingSlowdowns?: VestingSlowdown[];
 }): Promise<GrantRecord> {
   const employee = mockEmployees.find((emp) => emp.id === input.employeeId);
   if (!employee) throw new Error("Employee not found");
@@ -297,6 +301,9 @@ export async function createGrant(input: {
     monthly_vesting_rate: input.unitsAwarded / Math.max(input.scheduleLengthMonths - cliffMonths, 1),
     vesting_triggers: (input.vestingTriggers ?? []).filter(
       (trigger) => trigger.atMonth >= 1 && trigger.percentOfAward > 0
+    ),
+    vesting_slowdowns: (input.vestingSlowdowns ?? []).filter(
+      (slowdown) => slowdown.fromMonth >= 1 && slowdown.toMonth > slowdown.fromMonth && slowdown.paceMultiplier >= 0 && slowdown.paceMultiplier < 1
     ),
     contract_document_name: `Aequi_Grant_${employee.name.replace(/\s+/g, "_")}_${grantDate.replace(/-/g, "")}.pdf`,
     status: "pending" as const,

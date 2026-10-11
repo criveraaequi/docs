@@ -65,15 +65,18 @@ export function vestedUnitsAsOf(
   if (monthsElapsed < cliffMonths) return 0;
 
   const triggers = vesting.vestingTriggers ?? [];
+  const slowdowns = vesting.vestingSlowdowns ?? [];
   const triggeredPercent = Math.min(
     triggers.reduce((sum, trigger) => sum + trigger.percentOfAward, 0),
     100
   );
   const remainderPercent = 100 - triggeredPercent;
-  const remainingMonths = Math.max(
+  const monthlyUnits = (unitsAwarded * remainderPercent) / 100;
+  const totalVestingMonths = Math.max(
     monthsBetween(vesting.grantDate, vesting.vestingCompletionDate) - cliffMonths,
     1
   );
+  const baseMonthlyRate = monthlyUnits / totalVestingMonths;
 
   let vested = 0;
   for (const trigger of triggers) {
@@ -81,7 +84,21 @@ export function vestedUnitsAsOf(
       vested += Math.round((unitsAwarded * trigger.percentOfAward) / 100);
     }
   }
-  vested += ((unitsAwarded * remainderPercent) / 100 / remainingMonths) * (monthsElapsed - cliffMonths);
+
+  // Walk each elapsed month after the cliff, applying the slowest applicable
+  // pace. Slowed months vest less now and their shortfall (recoveryDebt) is
+  // added to later months, so the award still reaches 100% on the original date.
+  let recoveryDebt = 0;
+  for (let month = cliffMonths; month <= monthsElapsed; month += 1) {
+    let pace = 1;
+    for (const slowdown of slowdowns) {
+      if (month >= slowdown.fromMonth && month < slowdown.toMonth) {
+        pace = Math.min(pace, slowdown.paceMultiplier);
+      }
+    }
+    vested += (baseMonthlyRate + recoveryDebt) * pace;
+    recoveryDebt += baseMonthlyRate * (1 - pace);
+  }
   return Math.min(Math.round(vested), unitsAwarded);
 }
 

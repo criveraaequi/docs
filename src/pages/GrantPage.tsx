@@ -15,7 +15,7 @@ import {
   YAxis,
 } from "recharts";
 import { ContractDocument } from "@/components/ContractDocument";
-import type { VestingTrigger } from "@/data/types";
+import type { VestingSlowdown, VestingTrigger } from "@/data/types";
 import { formatDate } from "@/components/ValuationDetailModal";
 import {
   createGrant,
@@ -46,28 +46,46 @@ function buildVestingPreview(
   units: number,
   lengthMonths: number,
   cliffMonths: number,
-  triggers: VestingTrigger[]
+  triggers: VestingTrigger[],
+  slowdowns: VestingSlowdown[]
 ): VestingPreviewPoint[] {
-  const rate = units / Math.max(lengthMonths - cliffMonths, 1);
+  // Mirrors vestedUnitsAsOf in vesting.ts so the preview always matches the
+  // numbers saved with the grant: triggered chunks vest at their month, the
+  // remainder vests monthly at the slowest applicable pace, and slowdown
+  // shortfalls are recovered in later months (still 100% by the end date).
+  const triggerPercent = Math.min(
+    triggers.reduce((sum, trigger) => sum + (trigger.percentOfAward || 0), 0),
+    100
+  );
+  const monthlyUnits = (units * (100 - triggerPercent)) / 100;
+  const baseMonthlyRate = monthlyUnits / Math.max(lengthMonths - cliffMonths, 1);
+  const paceAt = (month: number) => {
+    let pace = 1;
+    for (const slowdown of slowdowns) {
+      if (month >= slowdown.fromMonth && month < slowdown.toMonth) {
+        pace = Math.min(pace, slowdown.paceMultiplier);
+      }
+    }
+    return pace;
+  };
+
   const points: VestingPreviewPoint[] = [];
+  let vested = 0;
+  let recoveryDebt = 0;
   for (let month = 0; month <= lengthMonths; month += 1) {
     const date = new Date();
     date.setMonth(date.getMonth() + month);
-    const vestedUnits = month < cliffMonths
-      ? 0
-      : Math.min(
-          Math.round(
-            (month - cliffMonths) * rate +
-              triggers.reduce(
-                (sum, trigger) => sum + (trigger.atMonth <= month ? units * trigger.percentOfAward / 100 : 0),
-                0
-              )
-          ),
-          units
-        );
+    if (month >= cliffMonths) {
+      vested += (baseMonthlyRate + recoveryDebt) * paceAt(month);
+      recoveryDebt += baseMonthlyRate * (1 - paceAt(month));
+    }
+    const triggerUnits = triggers.reduce(
+      (sum, trigger) => sum + (trigger.atMonth <= month ? units * trigger.percentOfAward / 100 : 0),
+      0
+    );
     points.push({
       label: date.toLocaleDateString("en-US", { month: "short", year: "2-digit" }),
-      vestedUnits,
+      vestedUnits: Math.min(Math.round(vested + triggerUnits), units),
       isCliff: month === cliffMonths,
       isTrigger: triggers.some((trigger) => trigger.atMonth === month),
     });
@@ -100,6 +118,7 @@ export function GrantPage({ llcId }: GrantPageProps) {
   const [useCustomCliff, setUseCustomCliff] = useState(false);
   const [triggersOpen, setTriggersOpen] = useState(false);
   const [triggers, setTriggers] = useState<VestingTrigger[]>([]);
+  const [slowdowns, setSlowdowns] = useState<VestingSlowdown[]>([]);
   const [submitted, setSubmitted] = useState<GrantRecord | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -156,14 +175,21 @@ export function GrantPage({ llcId }: GrantPageProps) {
     return date.toISOString().slice(0, 10);
   }, [lengthMonths]);
   const vestingPreviewSeries = useMemo(
-    () => buildVestingPreview(unitCount, lengthMonths, cliffMonths, triggers),
-    [unitCount, lengthMonths, cliffMonths, triggers]
+    () => buildVestingPreview(unitCount, lengthMonths, cliffMonths, triggers, slowdowns),
+    [unitCount, lengthMonths, cliffMonths, triggers, slowdowns]
   );
   const cliffPreviewPoint = vestingPreviewSeries.find((point) => point.isCliff);
   const totalTriggerPercent = Math.min(
     triggers.reduce((sum, trigger) => sum + (trigger.percentOfAward || 0), 0),
     100
   );
+  const activeSlowdowns = slowdowns.filter(
+    (slowdown) => slowdown.toMonth > slowdown.fromMonth && slowdown.paceMultiplier < 1
+  );
+  const slowdownOverSchedule = slowdowns.some(
+    (slowdown) => slowdown.toMonth > slowdown.fromMonth && slowdown.toMonth >= lengthMonths
+  );
+  const hasScheduleError = cliffOverLength || slowdownOverSchedule;
 
   async function handleSubmit() {
     if (!selectedEmployee) return;
@@ -179,6 +205,11 @@ export function GrantPage({ llcId }: GrantPageProps) {
         vestingTriggers: triggers.filter(
           (trigger) => trigger.atMonth >= 1 && trigger.percentOfAward > 0
         ),
+        vestingSlowdowns: activeSlowdowns.map((slowdown) => ({
+          fromMonth: Math.max(slowdown.fromMonth, cliffMonths),
+          toMonth: Math.min(slowdown.toMonth, lengthMonths),
+          paceMultiplier: slowdown.paceMultiplier,
+        })),
       });
       setSubmitted(grant);
     } catch (submitError) {
@@ -525,6 +556,110 @@ export function GrantPage({ llcId }: GrantPageProps) {
                 >
                   <Plus size={14} /> Add trigger
                 </button>
+                <div className="wizard-slowdowns-section">
+                  <span className="wizard-field-label">Slow down vesting</span>
+                  <p className="wizard-hint">
+                    Optional. Pick a window after the cliff and a pace — monthly vesting runs
+                    slower during the window, then catches up so the grant still finishes on
+                    the original fully-vested date. The window must end at least one month
+                    before the schedule ends.
+                  </p>
+                  {slowdowns.map((slowdown, index) => (
+                    <div className="wizard-trigger-row" key={index}>
+                      <label>
+                        <span>From month</span>
+                        <input
+                          type="number"
+                          min={cliffMonths + 1}
+                          max={lengthMonths - 1}
+                          value={slowdown.fromMonth || ""}
+                          onChange={(event) => {
+                            const value = Math.min(
+                              Math.max(Number(event.target.value) || 0, cliffMonths + 1),
+                              lengthMonths - 1
+                            );
+                            setSlowdowns((current) =>
+                              current.map((entry, entryIndex) =>
+                                entryIndex === index ? { ...entry, fromMonth: value } : entry
+                              )
+                            );
+                          }}
+                        />
+                      </label>
+                      <label>
+                        <span>To month</span>
+                        <input
+                          type="number"
+                          min={cliffMonths + 1}
+                          max={lengthMonths - 1}
+                          value={slowdown.toMonth || ""}
+                          onChange={(event) => {
+                            const value = Math.min(
+                              Math.max(Number(event.target.value) || 0, cliffMonths + 1),
+                              lengthMonths - 1
+                            );
+                            setSlowdowns((current) =>
+                              current.map((entry, entryIndex) =>
+                                entryIndex === index ? { ...entry, toMonth: value } : entry
+                              )
+                            );
+                          }}
+                        />
+                      </label>
+                      <label>
+                        <span>Pace</span>
+                        <select
+                          value={slowdown.paceMultiplier}
+                          onChange={(event) => {
+                            const value = Number(event.target.value);
+                            setSlowdowns((current) =>
+                              current.map((entry, entryIndex) =>
+                                entryIndex === index ? { ...entry, paceMultiplier: value } : entry
+                              )
+                            );
+                          }}
+                        >
+                          <option value={0.75}>75% speed</option>
+                          <option value={0.5}>Half speed</option>
+                          <option value={0.25}>Quarter speed</option>
+                          <option value={0}>Paused</option>
+                        </select>
+                      </label>
+                      <button
+                        className="wizard-trigger-remove"
+                        type="button"
+                        aria-label="Remove slowdown"
+                        onClick={() =>
+                          setSlowdowns((current) => current.filter((_, entryIndex) => entryIndex !== index))
+                        }
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                  {slowdownOverSchedule && (
+                    <p className="wizard-error">
+                      The slow window must end at least one month before the vesting schedule
+                      ends ({lengthMonths} months), so the missed vesting can be recovered.
+                    </p>
+                  )}
+                  <button
+                    className="wizard-triggers-add"
+                    type="button"
+                    onClick={() =>
+                      setSlowdowns((current) => [
+                        ...current,
+                        {
+                          fromMonth: Math.min(cliffMonths + 3, lengthMonths - 3),
+                          toMonth: Math.min(cliffMonths + 9, lengthMonths - 1),
+                          paceMultiplier: 0.5,
+                        },
+                      ])
+                    }
+                  >
+                    <Plus size={14} /> Add slow window
+                  </button>
+                </div>
               </div>
             )}
             <div className="card wizard-vesting-chart">
@@ -572,6 +707,8 @@ export function GrantPage({ llcId }: GrantPageProps) {
                 {" "}{lengthMonths} months with a {cliffMonths}-month cliff.
                 {triggers.filter((trigger) => trigger.percentOfAward > 0).length > 0 &&
                   ` ${triggers.filter((trigger) => trigger.percentOfAward > 0).length} trigger(s) applied.`}
+                {activeSlowdowns.length > 0 &&
+                  ` ${activeSlowdowns.length} slow window(s) applied.`}
               </p>
             </div>
             <div className="wizard-actions">
@@ -579,7 +716,7 @@ export function GrantPage({ llcId }: GrantPageProps) {
               <button
                 className="button-primary"
                 type="button"
-                disabled={cliffOverLength}
+                disabled={hasScheduleError}
                 onClick={() => setStep(4)}
               >
                 Continue <ArrowRight size={15} />
@@ -596,7 +733,7 @@ export function GrantPage({ llcId }: GrantPageProps) {
               <div><span>Units</span><strong>{unitCount.toLocaleString()}</strong></div>
               <div><span>Share of pool</span><strong>{((unitCount / poolUnits) * 100).toFixed(1)}%</strong></div>
               <div><span>Unit price</span><strong>${strikePrice.toFixed(2)}</strong></div>
-              <div><span>Vesting</span><strong>{lengthMonths} months, {cliffMonths}-month cliff{triggers.filter((trigger) => trigger.percentOfAward > 0).length > 0 ? `, ${triggers.filter((trigger) => trigger.percentOfAward > 0).length} trigger(s)` : ""}</strong></div>
+              <div><span>Vesting</span><strong>{lengthMonths} months, {cliffMonths}-month cliff{triggers.filter((trigger) => trigger.percentOfAward > 0).length > 0 ? `, ${triggers.filter((trigger) => trigger.percentOfAward > 0).length} trigger(s)` : ""}{activeSlowdowns.length > 0 ? `, ${activeSlowdowns.length} slow window(s)` : ""}</strong></div>
               <div><span>Grant date</span><strong>{formatDate(todayIso())}</strong></div>
               <div><span>Fully vested</span><strong>{formatDate(completionDate)}</strong></div>
             </div>
@@ -616,6 +753,7 @@ export function GrantPage({ llcId }: GrantPageProps) {
                   vestingCompletionDate: completionDate,
                   monthlyVestingRate: unitCount / Math.max(lengthMonths - cliffMonths, 1),
                   vestingTriggers: triggers,
+                  vestingSlowdowns: activeSlowdowns,
                   contractDocumentName: `Aequi_Grant_${selectedEmployee.name.replace(/\s+/g, "_")}_${todayIso().replace(/-/g, "")}.pdf`,
                   status: "pending",
                   signedAt: null,

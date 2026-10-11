@@ -119,6 +119,7 @@ export const mockEmployees: Employee[] = [
         scheduleLengthMonths: 36,
         monthlyVestingRate: 27.78, // (1000 / 36) per month after cliff
         vestingTriggers: [],
+        vestingSlowdowns: [],
       },
       currentVestedAmount: 0, // seed value — recomputed live in mockApi (see withLiveVesting)
       currentPayoutValue: 0,
@@ -146,6 +147,7 @@ export const mockEmployees: Employee[] = [
         scheduleLengthMonths: 36,
         monthlyVestingRate: 41.67, // (1500 / 36) per month after cliff
         vestingTriggers: [],
+        vestingSlowdowns: [],
       },
       currentVestedAmount: 500, // ~12 months past cliff
       currentPayoutValue: 48_500, // 500 × current strike price (97.0)
@@ -173,6 +175,7 @@ export const mockEmployees: Employee[] = [
         scheduleLengthMonths: 36,
         monthlyVestingRate: 13.89,
         vestingTriggers: [],
+        vestingSlowdowns: [],
       },
       currentVestedAmount: 167, // ~6 months vested post-cliff before termination
       currentPayoutValue: 16_199, // 167 × 97.0
@@ -201,6 +204,7 @@ export const mockEmployees: Employee[] = [
         scheduleLengthMonths: 48,
         monthlyVestingRate: 41.67, // (2000 / 48) per month after cliff
         vestingTriggers: [],
+        vestingSlowdowns: [],
       },
       currentVestedAmount: 0, // seed value — recomputed live in mockApi (see withLiveVesting)
       currentPayoutValue: 0,
@@ -228,6 +232,7 @@ export const mockEmployees: Employee[] = [
         scheduleLengthMonths: 36,
         monthlyVestingRate: 33.33, // (1200 / 36) per month after cliff
         vestingTriggers: [],
+        vestingSlowdowns: [],
       },
       currentVestedAmount: 466, // ~14 months past cliff
       currentPayoutValue: 41_357, // 466 × 88.75
@@ -255,6 +260,7 @@ export const mockEmployees: Employee[] = [
         scheduleLengthMonths: 36,
         monthlyVestingRate: 17.5, // (420 / 24) per month after cliff
         vestingTriggers: [],
+        vestingSlowdowns: [],
       },
       currentVestedAmount: 0, // seed value — recomputed live in mockApi (see withLiveVesting)
       currentPayoutValue: 0,
@@ -282,6 +288,7 @@ export const mockEmployees: Employee[] = [
         scheduleLengthMonths: 48,
         monthlyVestingRate: 12.5, // (450 / 36) per month after cliff
         vestingTriggers: [],
+        vestingSlowdowns: [],
       },
       currentVestedAmount: 0, // seed value — recomputed live in mockApi (see withLiveVesting)
       currentPayoutValue: 0,
@@ -309,6 +316,7 @@ export const mockEmployees: Employee[] = [
         scheduleLengthMonths: 24,
         monthlyVestingRate: 17.5, // (210 / 12) per month after cliff
         vestingTriggers: [],
+        vestingSlowdowns: [],
       },
       currentVestedAmount: 0, // seed value — recomputed live in mockApi (see withLiveVesting)
       currentPayoutValue: 0,
@@ -336,6 +344,7 @@ export const mockEmployees: Employee[] = [
         scheduleLengthMonths: 36,
         monthlyVestingRate: 15.83, // (380 / 24) per month after cliff
         vestingTriggers: [],
+        vestingSlowdowns: [],
       },
       currentVestedAmount: 0, // seed value — recomputed live in mockApi (see withLiveVesting)
       currentPayoutValue: 0,
@@ -363,6 +372,7 @@ export const mockEmployees: Employee[] = [
         scheduleLengthMonths: 24,
         monthlyVestingRate: 13.75, // (165 / 12) per month after cliff
         vestingTriggers: [],
+        vestingSlowdowns: [],
       },
       currentVestedAmount: 0, // seed value — recomputed live in mockApi (see withLiveVesting)
       currentPayoutValue: 0,
@@ -390,6 +400,7 @@ export const mockEmployees: Employee[] = [
         scheduleLengthMonths: 36,
         monthlyVestingRate: 13.54, // (325 / 24) per month after cliff
         vestingTriggers: [],
+        vestingSlowdowns: [],
       },
       currentVestedAmount: 0, // seed value — recomputed live in mockApi (see withLiveVesting)
       currentPayoutValue: 0,
