@@ -2,7 +2,9 @@
 // Rendered as a formatted page rather than a real PDF for the closed beta.
 import { formatDate } from "@/components/ValuationDetailModal";
 import type { GrantRecord } from "@/data/grantStore";
+import { getValuationHistory } from "@/data/mockApi";
 import type { LLCAuthorizedUser, LLC } from "@/data/types";
+import { currentStrikePrice, fullMonthsBetween } from "@/data/vesting";
 
 interface ContractDocumentProps {
   grant: GrantRecord;
@@ -12,6 +14,31 @@ interface ContractDocumentProps {
 
 export function ContractDocument({ grant, llc, owner }: ContractDocumentProps) {
   const isSigned = grant.status === "active";
+
+  const valuationHistory = getValuationHistory(grant.llcId);
+  const currentPrice = currentStrikePrice(valuationHistory, grant.strikePricePerUnit);
+  const latestValuation = valuationHistory.length > 0 ? valuationHistory[valuationHistory.length - 1] : null;
+  const priceHasChanged = Math.abs(currentPrice - grant.strikePricePerUnit) > 0.005;
+
+  const cliffMonths = Math.max(fullMonthsBetween(grant.grantDate, grant.cliffDate), 0);
+  const triggers = grant.vestingTriggers.filter((trigger) => trigger.percentOfAward > 0);
+  const triggerPercent = Math.min(
+    triggers.reduce((sum, trigger) => sum + trigger.percentOfAward, 0),
+    100
+  );
+  const slowdowns = grant.vestingSlowdowns.filter(
+    (slowdown) => slowdown.toMonth > slowdown.fromMonth && slowdown.paceMultiplier < 1
+  );
+  const vestingMonths = Math.max(grant.scheduleLengthMonths - cliffMonths, 1);
+  const monthlyRate = (grant.unitsAwarded * (100 - triggerPercent)) / 100 / vestingMonths;
+
+  const dateAt = (month: number) => {
+    const date = new Date(grant.grantDate);
+    date.setMonth(date.getMonth() + month);
+    return date.toISOString().slice(0, 10);
+  };
+  const slowdownDuration = (slowdown: (typeof grant.vestingSlowdowns)[number]) =>
+    slowdown.toMonth - slowdown.fromMonth;
 
   return (
     <article className="contract-doc">
@@ -42,28 +69,57 @@ export function ContractDocument({ grant, llc, owner }: ContractDocumentProps) {
         <h2>2. Unit Price</h2>
         <p>
           The initial unit price is <strong>${grant.strikePricePerUnit.toFixed(2)}</strong> per
-          Unit, derived from the Company’s most recent certified valuation as of the grant date.
-          The unit price may be adjusted upon future certified valuations.
+          Unit, derived from the Company’s certified valuation as of the grant date.
+        </p>
+        {priceHasChanged && latestValuation && (
+          <p>
+            Following the certified valuation of {formatDate(latestValuation.date)}, the unit
+            price currently in effect is <strong>${currentPrice.toFixed(2)}</strong> per Unit.
+          </p>
+        )}
+        <p>
+          The unit price is recalculated upon each future certified valuation of the Company.
+          Vested Units remain payable at the unit price in effect at the time of payout, so a
+          future valuation may increase or decrease the per-Unit payout value.
         </p>
 
         <h2>3. Vesting Schedule</h2>
         <p>
-          The Units vest under the Company’s standard schedule: a one-year cliff followed by
-          monthly vesting over a total period of{" "}
-          <strong>{grant.scheduleLengthMonths} months</strong>.
+          The Units vest over a total period of{" "}
+          <strong>{grant.scheduleLengthMonths} months</strong> from the grant date, with a
+          cliff of <strong>{cliffMonths} months</strong>. No Units vest before the cliff date;
+          after the cliff, the remaining Units vest in monthly installments until the schedule
+          completes.
         </p>
         <ul>
           <li>
-            <strong>Cliff date:</strong> {formatDate(grant.cliffDate)} —{" "}
-            {Math.round((grant.scheduleLengthMonths / 12) * 100) / 100 > 0
-              ? `${Math.round((grant.unitsAwarded * 12 / grant.scheduleLengthMonths) * 100) / 100} units`
-              : "0 units"}{" "}
-            vest upon completion of the cliff (one year of service).
+            <strong>Cliff:</strong> {formatDate(grant.cliffDate)} — {cliffMonths} months of
+            service ({Math.round((cliffMonths / 12) * 10) / 10} years). Nothing vests before
+            this date.
           </li>
           <li>
             <strong>Monthly vesting:</strong>{" "}
-            {grant.monthlyVestingRate.toFixed(2).replace(/\.00$/, "")} units per month thereafter.
+            {monthlyRate.toFixed(2).replace(/\.00$/, "")} units per month from the cliff date
+            through the completion date{triggerPercent > 0 && ", covering the portion of the award not released by trigger"}.
           </li>
+          {triggers.map((trigger, index) => (
+            <li key={`trigger-${index}`}>
+              <strong>Vesting trigger {index + 1}:</strong>{" "}
+              {Math.round((grant.unitsAwarded * trigger.percentOfAward) / 100).toLocaleString()}
+              units ({trigger.percentOfAward}% of the award) release on{" "}
+              {formatDate(dateAt(trigger.atMonth))} — month {trigger.atMonth} of the schedule.
+            </li>
+          ))}
+          {slowdowns.map((slowdown, index) => (
+            <li key={`slowdown-${index}`}>
+              <strong>Slowdown window {index + 1}:</strong> from month {slowdown.fromMonth} ({formatDate(dateAt(slowdown.fromMonth))}) to
+              month {slowdown.toMonth} ({formatDate(dateAt(slowdown.toMonth))}) — {slowdownDuration(slowdown)} months, during which
+              monthly vesting runs at {Math.round(slowdown.paceMultiplier * 100)}% of the normal
+              pace (about {(monthlyRate * slowdown.paceMultiplier).toFixed(2)} units per month).
+              Vesting missed during the window is recovered in later months, so the award still
+              fully vests on the completion date.
+            </li>
+          ))}
           <li>
             <strong>Fully vested:</strong> {formatDate(grant.vestingCompletionDate)}.
           </li>
