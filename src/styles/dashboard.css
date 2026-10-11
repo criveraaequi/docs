@@ -370,8 +370,9 @@
   margin-top: 10px; font-size: 0.74rem; color: #8a93a3;
 }
 .chart-scale-toggle {
-  display: flex; gap: 6px; justify-content: flex-end; margin-bottom: 8px;
+  display: flex; gap: 6px; justify-content: space-between; align-items: center; margin-bottom: 8px;
 }
+.chart-scale-toggle-group { display: flex; gap: 6px; }
 .chart-scale-toggle .scale-toggle.is-on {
   background: var(--navy); color: var(--card); border-color: var(--navy);
 }

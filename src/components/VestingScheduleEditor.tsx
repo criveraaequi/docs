@@ -133,6 +133,23 @@ function monthLabel(month: number): string {
   return date.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
 }
 
+/** "6 mo", "1 yr", "1.5 yrs" — time elapsed since the grant date. */
+function elapsedLabel(month: number): string {
+  if (month === 0) return "Start";
+  if (month < 12) return `${month} mo`;
+  const years = month / 12;
+  const rounded = Math.round(years * 10) / 10;
+  return `${rounded} yr${rounded === 1 ? "" : "s"}`;
+}
+
+/** Tick every 6 months so half-year marks appear in both axis modes. */
+function axisTicks(lengthMonths: number): number[] {
+  const ticks: number[] = [];
+  for (let month = 0; month <= lengthMonths; month += 6) ticks.push(month);
+  if (ticks[ticks.length - 1] !== lengthMonths) ticks.push(lengthMonths);
+  return ticks;
+}
+
 interface VestingPreviewPoint {
   month: number;
   vestedUnits: number;
@@ -219,6 +236,7 @@ export function VestingScheduleEditor({ units, schedule, onChange }: VestingSche
   const [triggersOpen, setTriggersOpen] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [showPercent, setShowPercent] = useState(false);
+  const [elapsedAxis, setElapsedAxis] = useState(false);
   const [drag, setDrag] = useState<DragState | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
@@ -636,14 +654,25 @@ export function VestingScheduleEditor({ units, schedule, onChange }: VestingSche
       )}
       <div className="card wizard-vesting-chart">
         <div className="chart-scale-toggle">
-          <button
-            type="button"
-            className={`scale-toggle${showPercent ? "" : " is-on"}`}
-            aria-pressed={!showPercent}
-            onClick={() => setShowPercent(false)}
-          >
-            Units
-          </button>
+          <div className="chart-scale-toggle-group">
+            <button
+              type="button"
+              className={`scale-toggle${elapsedAxis ? "" : " is-on"}`}
+              aria-pressed={!elapsedAxis}
+              onClick={() => setElapsedAxis(false)}
+            >
+              Dates
+            </button>
+            <button
+              type="button"
+              className={`scale-toggle${elapsedAxis ? " is-on" : ""}`}
+              aria-pressed={elapsedAxis}
+              onClick={() => setElapsedAxis(true)}
+            >
+              Elapsed
+            </button>
+          </div>
+          <div className="chart-scale-toggle-group">
           <button
             type="button"
             className={`scale-toggle${showPercent ? " is-on" : ""}`}
@@ -652,6 +681,7 @@ export function VestingScheduleEditor({ units, schedule, onChange }: VestingSche
           >
             % vested
           </button>
+          </div>
         </div>
         <div className="chart-wrap" ref={wrapRef}>
           <ResponsiveContainer width="100%" height="100%">
@@ -665,7 +695,10 @@ export function VestingScheduleEditor({ units, schedule, onChange }: VestingSche
                 tick={{ fill: "#8a93a3", fontSize: 11 }}
                 tickLine={false}
                 axisLine={false}
-                tickFormatter={(value: number) => monthLabel(value)}
+                ticks={axisTicks(lengthMonths)}
+                tickFormatter={(value: number) =>
+                  elapsedAxis ? elapsedLabel(value) : monthLabel(value)
+                }
               />
               <YAxis
                 tick={{ fill: "#8a93a3", fontSize: 11 }}
@@ -690,7 +723,11 @@ export function VestingScheduleEditor({ units, schedule, onChange }: VestingSche
                     ? [`${Number(value)}% of award`, "Vested"]
                     : [`${Number(value).toLocaleString()} units`, "Vested units"]
                 }
-                labelFormatter={(label: unknown) => monthLabel(Number(label))}
+                labelFormatter={(label: unknown) =>
+                  elapsedAxis
+                    ? `${elapsedLabel(Number(label))} (month ${Number(label)})`
+                    : monthLabel(Number(label))
+                }
               />
               <ReferenceLine
                 x={cliffMonths}
