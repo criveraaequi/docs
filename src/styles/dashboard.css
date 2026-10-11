@@ -277,8 +277,8 @@
 .flow-body { padding: 20px 28px 28px; flex: 1; display: flex; flex-direction: column; }
 .flow-body .wizard-actions { margin-top: auto; padding-top: 22px; }
 .flow-employee-list {
-  max-height: none; overflow: visible; flex: 1;
-  justify-content: flex-start;
+  max-height: none !important; overflow-y: visible !important; overflow: visible;
+  flex: 1; justify-content: flex-start;
 }
 .flow-employee-list .wizard-employee-row { padding: 14px 14px; }
 .flow-confirm-card { max-width: 560px; margin: auto 0; text-align: center; padding: 40px 36px 32px; }
