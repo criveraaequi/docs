@@ -673,14 +673,22 @@ export function VestingScheduleEditor({ units, schedule, onChange }: VestingSche
             </button>
           </div>
           <div className="chart-scale-toggle-group">
-          <button
-            type="button"
-            className={`scale-toggle${showPercent ? " is-on" : ""}`}
-            aria-pressed={showPercent}
-            onClick={() => setShowPercent(true)}
-          >
-            % vested
-          </button>
+            <button
+              type="button"
+              className={`scale-toggle${showPercent ? "" : " is-on"}`}
+              aria-pressed={!showPercent}
+              onClick={() => setShowPercent(false)}
+            >
+              Units
+            </button>
+            <button
+              type="button"
+              className={`scale-toggle${showPercent ? " is-on" : ""}`}
+              aria-pressed={showPercent}
+              onClick={() => setShowPercent(true)}
+            >
+              % vested
+            </button>
           </div>
         </div>
         <div className="chart-wrap" ref={wrapRef}>
