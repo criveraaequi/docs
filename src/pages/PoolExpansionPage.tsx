@@ -117,6 +117,63 @@ export function PoolExpansionPage({ llcId }: PoolExpansionPageProps) {
                 />
               </div>
             </div>
+            <div className="expansion-sim" aria-label="Simulation: phantom pool size compared to the whole company">
+              <div className="expansion-sim-head">
+                <span className="eyebrow">Simulation · pool vs company</span>
+                {isValid && (
+                  <span className="expansion-sim-delta">
+                    {effectivePercent}% of the company in the pool
+                  </span>
+                )}
+              </div>
+              {isValid ? (
+                <>
+                  <div className="pool-bar expansion-sim-bar">
+                    <div
+                      className="pool-bar-segment"
+                      style={{ width: `${currentPercent}%`, backgroundColor: "#1f3164" }}
+                      title={`Current pool — ${currentPercent}% of company (${oldUnits.toLocaleString()} units)`}
+                    />
+                    <div
+                      className="pool-bar-segment"
+                      style={{ width: `${effectivePercent - currentPercent}%`, backgroundColor: "#4a7c59" }}
+                      title={`New expansion — +${(effectivePercent - currentPercent).toFixed(0)} points (${addedUnits.toLocaleString()} new units)`}
+                    />
+                    <div
+                      className="pool-bar-segment"
+                      style={{ width: `${100 - effectivePercent}%`, backgroundColor: "#d9d7ce" }}
+                      title={`Everyone else — ${(100 - effectivePercent).toFixed(0)}% of company`}
+                    />
+                  </div>
+                  <div className="expansion-sim-legend">
+                    <div className="legend-item">
+                      <span className="legend-swatch" style={{ backgroundColor: "#1f3164" }} />
+                      <span>Current pool</span>
+                      <strong>{currentPercent}%</strong>
+                    </div>
+                    <div className="legend-item">
+                      <span className="legend-swatch" style={{ backgroundColor: "#4a7c59" }} />
+                      <span>New expansion</span>
+                      <strong>+{(effectivePercent - currentPercent).toFixed(0)} pts</strong>
+                    </div>
+                    <div className="legend-item">
+                      <span className="legend-swatch" style={{ backgroundColor: "#d9d7ce" }} />
+                      <span>Outside the pool</span>
+                      <strong>{(100 - effectivePercent).toFixed(0)}%</strong>
+                    </div>
+                  </div>
+                  <p className="expansion-sim-note">
+                    If approved, <strong>{effectivePercent}%</strong> of all company value would flow
+                    through the phantom pool — up from {currentPercent}% today.
+                  </p>
+                </>
+              ) : (
+                <p className="expansion-sim-note">
+                  Pick a percentage above your current {currentPercent}% to preview how the pool
+                  would sit inside the company.
+                </p>
+              )}
+            </div>
             <p className="expansion-units-note">
               {effectivePercent > currentPercent
                 ? <>

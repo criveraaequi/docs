@@ -502,6 +502,16 @@
 /* --- Pool expansion ------------------------------------------------------ */
 
 .expansion-units-note {
+
+.expansion-sim { margin-top: 22px; padding: 18px; border: 1px solid var(--card-border, rgba(31, 49, 100, 0.12)); border-radius: 6px; background: rgba(31, 49, 100, 0.03); display: grid; gap: 12px; }
+.expansion-sim-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.expansion-sim-delta { color: #1f3164; font-size: 0.8rem; font-weight: 600; }
+.expansion-sim-bar { height: 26px; }
+.expansion-sim-legend { display: flex; flex-wrap: wrap; gap: 14px; }
+.expansion-sim-legend .legend-item { gap: 7px; font-size: 0.76rem; }
+.expansion-sim-legend .legend-item strong { margin-left: 0; font-size: 0.76rem; }
+.expansion-sim-note { color: #5c6b8a; font-size: 0.82rem; line-height: 1.5; margin: 0; }
+.expansion-sim-note strong { color: #1f3164; }
   margin: 14px 0 0; padding: 12px 14px; border-radius: 6px;
   background: rgba(31, 49, 100, 0.05); color: #1f3164; font-size: 0.88rem; line-height: 1.5;
 }
