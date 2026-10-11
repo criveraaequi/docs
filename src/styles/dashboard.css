@@ -638,6 +638,13 @@
 }
 .pending-inline { margin-left: 6px; }
 
+/* --- Per-agreement cards on the employee page ------------------------------ */
+
+.grant-agreement-card { border-left: 3px solid rgba(31, 49, 100, 0.35); }
+.grant-agreement-card h2 { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.grant-agreement-card .chart-wrap.payout-chart { height: 240px; margin: 16px 0; }
+.pending-sign-row { margin-top: 14px; display: flex; justify-content: flex-end; }
+
 /* --- Responsive ------------------------------------------------------------ */
 
 @media (max-width: 720px) {
