@@ -79,6 +79,42 @@ function runtimeGrantToEquityGrant(record: GrantRecord): EquityGrant {
   };
 }
 
+/**
+ * Merge several schedules onto one calendar timeline: combined vested units
+ * per month across all agreements, priced at the unit price in effect on
+ * each date (held constant after the latest valuation).
+ */
+function buildCombinedSeries(grants: EquityGrant[], history: ValuationEvent[]): VestingPoint[] {
+  const byDate = new Map<string, VestingPoint>();
+  for (const grant of grants) {
+    const { vesting } = grant;
+    const months = Math.max(fullMonthsBetween(vesting.grantDate, vesting.vestingCompletionDate), 1);
+    for (let month = 0; month <= months; month += 1) {
+      const date = new Date(vesting.grantDate);
+      date.setMonth(date.getMonth() + month);
+      const iso = date.toISOString().slice(0, 10);
+      const vested = vestedUnitsAsOf(grant, iso);
+      const existing = byDate.get(iso);
+      if (existing) existing.vestedUnits += vested;
+      else {
+        byDate.set(iso, {
+          label: date.toLocaleDateString("en-US", { month: "short", year: "2-digit" }),
+          dateIso: iso,
+          vestedUnits: vested,
+          vestedValue: 0,
+          isCliff: false,
+          isToday: false,
+        });
+      }
+    }
+  }
+  const sorted = [...byDate.values()].sort((a, b) => a.dateIso.localeCompare(b.dateIso));
+  for (const point of sorted) {
+    point.vestedValue = Math.round(point.vestedUnits * strikePriceAt(history, point.dateIso));
+  }
+  return sorted;
+}
+
 function formatYears(months: number): string {
   if (months % 12 === 0) return `${months / 12} yr${months === 12 ? "" : "s"}`;
   return `${months} mo`;
@@ -191,6 +227,8 @@ export function EmployeeDetailPage() {
           </div>
         </section>
 
+        <TotalVestingCard views={liveViews} history={history} showValue={showValue} />
+
         {liveViews.map((view, index) => (
           <GrantAgreementCard
             key={view.key}
@@ -202,6 +240,162 @@ export function EmployeeDetailPage() {
         ))}
       </div>
     </AppShell>
+  );
+}
+
+interface CliffMarker {
+  label: string;
+  text: string;
+}
+
+interface VestingChartProps {
+  data: VestingPoint[];
+  showValue: boolean;
+  yMax: number;
+  cliffMarkers: CliffMarker[];
+}
+
+function VestingChart({ data, showValue, yMax, cliffMarkers }: VestingChartProps) {
+  const dataKey = showValue ? "vestedValue" : "vestedUnits";
+  const formatTick = (value: number) =>
+    showValue
+      ? `${value >= 1000 ? `${(value / 1000).toFixed(value >= 10000 ? 0 : 1)}k` : value.toFixed(0)}`
+      : value.toLocaleString();
+  return (
+    <div className="chart-wrap payout-chart">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data} margin={{ top: 24, right: 16, left: 4, bottom: 4 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(138, 147, 163, .18)" vertical={false} />
+          <XAxis dataKey="label" tick={{ fill: "#8a93a3", fontSize: 11 }} tickLine={false} axisLine={false} minTickGap={28} />
+          <YAxis
+            tick={{ fill: "#8a93a3", fontSize: 11 }}
+            tickLine={false}
+            axisLine={false}
+            width={58}
+            domain={[0, yMax]}
+            tickFormatter={formatTick}
+          />
+          <Tooltip
+            cursor={{ stroke: "rgba(138, 147, 163, .35)" }}
+            contentStyle={{ border: "1px solid rgba(138, 147, 163, .25)", borderRadius: 5, background: "#fdfcf9", fontFamily: "Work Sans" }}
+            formatter={(value: unknown) =>
+              showValue
+                ? [currency.format(Number(value)), "Vested value"]
+                : [`${Number(value).toLocaleString()} units`, "Vested units"]
+            }
+            labelFormatter={(label: unknown) => String(label)}
+          />
+          {cliffMarkers.map((marker) => (
+            <ReferenceLine
+              key={`${marker.label}-${marker.text}`}
+              x={marker.label}
+              stroke="#b07d3a"
+              strokeDasharray="5 4"
+              label={{ value: marker.text, position: "top", fill: "#b07d3a", fontSize: 10, letterSpacing: "0.08em" }}
+            />
+          ))}
+          <Area
+            type="monotone"
+            dataKey={dataKey}
+            stroke="#1f3164"
+            strokeWidth={2.5}
+            fill="rgba(31, 49, 100, .1)"
+            activeDot={{ r: 5, fill: "#1f3164", stroke: "#fdfcf9", strokeWidth: 2 }}
+            dot={(props: unknown) => {
+              const { cx, cy, payload, key } = props as { cx?: number; cy?: number; payload?: VestingPoint; key?: string };
+              if (cx === undefined || cy === undefined || !payload) return <g key={key} />;
+              if (payload.isToday) {
+                return (
+                  <g key={key} className="today-marker" tabIndex={0}>
+                    <circle cx={cx} cy={cy} r={11} fill="#b07d3a" className="today-marker-pulse" />
+                    <circle cx={cx} cy={cy} r={4.5} fill="#b07d3a" stroke="#fdfcf9" strokeWidth={2} className="today-dot" />
+                    <text x={cx} y={cy - 18} textAnchor="middle" fill="#b07d3a" fontSize={10} letterSpacing="0.08em">TODAY</text>
+                  </g>
+                );
+              }
+              return <circle key={key} cx={cx} cy={cy} r={3} fill="#1f3164" />;
+            }}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function TotalVestingCard({
+  views,
+  history,
+  showValue,
+}: {
+  views: (GrantView & { vestedUnits: number; vestedValue: number })[];
+  history: ValuationEvent[];
+  showValue: boolean;
+}) {
+  if (views.length === 0) return null;
+
+  const today = todayIso();
+  const todayTime = new Date(today).getTime();
+  const firstStart = Math.min(...views.map((v) => new Date(v.grant.vesting.grantDate).getTime()));
+  const lastCompletion = Math.max(...views.map((v) => new Date(v.grant.vesting.vestingCompletionDate).getTime()));
+
+  const series = buildCombinedSeries(views.map((v) => v.grant), history);
+
+  const displaySeries = (() => {
+    if (todayTime < firstStart || todayTime > lastCompletion || series.length === 0) return series;
+    const units = views.reduce((sum, v) => sum + vestedUnitsAsOf(v.grant, today), 0);
+    const todayPoint: VestingPoint = {
+      label: new Date(today).toLocaleDateString("en-US", { month: "short", year: "2-digit" }),
+      dateIso: today,
+      vestedUnits: units,
+      vestedValue: Math.round(units * strikePriceAt(history, today)),
+      isCliff: false,
+      isToday: true,
+    };
+    const insertIndex = series.findIndex((point) => new Date(point.dateIso).getTime() > todayTime);
+    const next = [...series];
+    if (insertIndex === -1) next.push(todayPoint);
+    else next.splice(insertIndex, 0, todayPoint);
+    return next;
+  })();
+
+  const cliffMarkers: CliffMarker[] = [];
+  views.forEach((view, index) => {
+    const cliffMonth = fullMonthsBetween(view.grant.vesting.grantDate, view.grant.vesting.cliffDate);
+    const date = new Date(view.grant.vesting.grantDate);
+    date.setMonth(date.getMonth() + cliffMonth);
+    const label = date.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+    const existing = cliffMarkers.find((marker) => marker.label === label);
+    if (existing) existing.text = `${existing.text}, ${index + 1}`;
+    else cliffMarkers.push({ label, text: `CLIFF · AGMT ${index + 1}` });
+  });
+
+  const yMax = showValue
+    ? Math.max(...displaySeries.map((p) => p.vestedValue), 1)
+    : Math.max(...displaySeries.map((p) => p.vestedUnits), 1);
+
+  const latestValuation = history[history.length - 1];
+  const constantPrice = latestValuation?.resultingStrikePrice ?? views[0].grant.strikePricePerUnit;
+  const fullyVestedLabel = formatDate(new Date(lastCompletion).toISOString().slice(0, 10));
+
+  return (
+    <section className="card total-vesting-card">
+      <div className="card-heading">
+        <div>
+          <span className="eyebrow">All agreements combined</span>
+          <h2>Total influx as schedules mature</h2>
+        </div>
+        <span className="updated-label">Fully vested by {fullyVestedLabel}</span>
+      </div>
+      <VestingChart data={displaySeries} showValue={showValue} yMax={yMax} cliffMarkers={cliffMarkers} />
+      <p className="total-caption">
+        Combined vested units across {views.length} agreement{views.length === 1 ? "" : "s"}, priced at the unit
+        price in effect on each date.
+        {latestValuation && (
+          <> Beyond the {formatDate(latestValuation.date)} valuation, value is held constant at
+          ${constantPrice.toFixed(2)} per unit until the next certified valuation.</>
+        )}
+      </p>
+    </section>
   );
 }
 
@@ -255,11 +449,7 @@ function GrantAgreementCard({ index, view, history, showValue }: GrantAgreementC
   }, [series, todayTime, grantStartTime, completionTime, today, view.vestedUnits, view.vestedValue]);
 
   const cliffPoint = series.find((point) => point.isCliff);
-  const dataKey = showValue ? "vestedValue" : "vestedUnits";
-  const formatTick = (value: number) =>
-    showValue
-      ? `$${value >= 1000 ? `${(value / 1000).toFixed(value >= 10000 ? 0 : 1)}k` : value.toFixed(0)}`
-      : value.toLocaleString();
+  const cliffMarkers: CliffMarker[] = cliffPoint ? [{ label: cliffPoint.label, text: "CLIFF" }] : [];
 
   return (
     <section className="card grant-agreement-card">
@@ -299,62 +489,12 @@ function GrantAgreementCard({ index, view, history, showValue }: GrantAgreementC
         )}
       </div>
 
-      <div className="chart-wrap payout-chart">
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={displaySeries} margin={{ top: 24, right: 16, left: 4, bottom: 4 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(138, 147, 163, .18)" vertical={false} />
-            <XAxis dataKey="label" tick={{ fill: "#8a93a3", fontSize: 11 }} tickLine={false} axisLine={false} minTickGap={28} />
-            <YAxis
-              tick={{ fill: "#8a93a3", fontSize: 11 }}
-              tickLine={false}
-              axisLine={false}
-              width={58}
-              domain={[0, showValue ? Math.max(...displaySeries.map((p) => p.vestedValue), 1) : grant.unitsAwarded]}
-              tickFormatter={formatTick}
-            />
-            <Tooltip
-              cursor={{ stroke: "rgba(138, 147, 163, .35)" }}
-              contentStyle={{ border: "1px solid rgba(138, 147, 163, .25)", borderRadius: 5, background: "#fdfcf9", fontFamily: "Work Sans" }}
-              formatter={(value: unknown) =>
-                showValue
-                  ? [currency.format(Number(value)), "Vested value"]
-                  : [`${Number(value).toLocaleString()} units`, "Vested units"]
-              }
-              labelFormatter={(label: unknown) => String(label)}
-            />
-            {cliffPoint && (
-              <ReferenceLine
-                x={cliffPoint.label}
-                stroke="#b07d3a"
-                strokeDasharray="5 4"
-                label={{ value: "CLIFF", position: "top", fill: "#b07d3a", fontSize: 10, letterSpacing: "0.08em" }}
-              />
-            )}
-            <Area
-              type="monotone"
-              dataKey={dataKey}
-              stroke="#1f3164"
-              strokeWidth={2.5}
-              fill="rgba(31, 49, 100, .1)"
-              activeDot={{ r: 5, fill: "#1f3164", stroke: "#fdfcf9", strokeWidth: 2 }}
-              dot={(props: unknown) => {
-                const { cx, cy, payload, key } = props as { cx?: number; cy?: number; payload?: VestingPoint; key?: string };
-                if (cx === undefined || cy === undefined || !payload) return <g key={key} />;
-                if (payload.isToday) {
-                  return (
-                    <g key={key} className="today-marker" tabIndex={0}>
-                      <circle cx={cx} cy={cy} r={11} fill="#b07d3a" className="today-marker-pulse" />
-                      <circle cx={cx} cy={cy} r={4.5} fill="#b07d3a" stroke="#fdfcf9" strokeWidth={2} className="today-dot" />
-                      <text x={cx} y={cy - 18} textAnchor="middle" fill="#b07d3a" fontSize={10} letterSpacing="0.08em">TODAY</text>
-                    </g>
-                  );
-                }
-                return <circle key={key} cx={cx} cy={cy} r={3} fill="#1f3164" />;
-              }}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
+      <VestingChart
+        data={displaySeries}
+        showValue={showValue}
+        yMax={showValue ? Math.max(...displaySeries.map((p) => p.vestedValue), 1) : grant.unitsAwarded}
+        cliffMarkers={cliffMarkers}
+      />
 
       <div className="vesting-progress">
         <div className="vesting-progress-header">

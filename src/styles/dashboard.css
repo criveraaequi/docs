@@ -644,6 +644,8 @@
 .grant-agreement-card h2 { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .grant-agreement-card .chart-wrap.payout-chart { height: 240px; margin: 16px 0; }
 .pending-sign-row { margin-top: 14px; display: flex; justify-content: flex-end; }
+.total-vesting-card { border-left: 3px solid #b07d3a; }
+.total-caption { color: var(--slate); font-size: 12px; line-height: 1.5; margin: 14px 0 0; }
 .grant-agreement-card .payout-projected { margin: 18px 0 0; padding-top: 14px; border-top: 1px solid var(--card-border); }
 
 /* --- Responsive ------------------------------------------------------------ */
