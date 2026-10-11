@@ -60,6 +60,27 @@ export interface NotificationRecord {
   createdAt: string;
 }
 
+export type ContactType = "analyst" | "cpa";
+
+export interface ConversationRecord {
+  id: string;
+  llcId: string;
+  contactType: ContactType;
+  contactName: string;
+  createdAt: string;
+}
+
+export type MessageSender = "owner" | "contact";
+
+export interface MessageRecord {
+  id: string;
+  conversationId: string;
+  sender: MessageSender;
+  body: string;
+  read: boolean;
+  createdAt: string;
+}
+
 // --- Row <-> record mapping -------------------------------------------------
 
 interface GrantRow {
@@ -101,6 +122,23 @@ interface NotificationRow {
   llc_id: string | null;
   grant_id: string | null;
   message: string;
+  read: boolean;
+  created_at: string;
+}
+
+interface ConversationRow {
+  id: string;
+  llc_id: string;
+  contact_type: string;
+  contact_name: string;
+  created_at: string;
+}
+
+interface MessageRow {
+  id: string;
+  conversation_id: string;
+  sender: string;
+  body: string;
   read: boolean;
   created_at: string;
 }
@@ -154,6 +192,27 @@ function toNotificationRecord(row: NotificationRow): NotificationRecord {
   };
 }
 
+function toConversationRecord(row: ConversationRow): ConversationRecord {
+  return {
+    id: row.id,
+    llcId: row.llc_id,
+    contactType: row.contact_type as ContactType,
+    contactName: row.contact_name,
+    createdAt: row.created_at,
+  };
+}
+
+function toMessageRecord(row: MessageRow): MessageRecord {
+  return {
+    id: row.id,
+    conversationId: row.conversation_id,
+    sender: row.sender as MessageSender,
+    body: row.body,
+    read: row.read,
+    createdAt: row.created_at,
+  };
+}
+
 // --- Store ------------------------------------------------------------------
 
 let grantsCache: GrantRecord[] | null = null;
@@ -162,6 +221,10 @@ let expansionsCache: PoolExpansionRecord[] | null = null;
 let expansionsPromise: Promise<PoolExpansionRecord[]> | null = null;
 let notificationsCache: NotificationRecord[] | null = null;
 let notificationsPromise: Promise<NotificationRecord[]> | null = null;
+let conversationsCache: ConversationRecord[] | null = null;
+let conversationsPromise: Promise<ConversationRecord[]> | null = null;
+let messagesCache: MessageRecord[] | null = null;
+let messagesPromise: Promise<MessageRecord[]> | null = null;
 
 const listeners = new Set<() => void>();
 let storeVersion = 0;
@@ -241,9 +304,53 @@ async function fetchNotifications(): Promise<NotificationRecord[]> {
   return notificationsPromise;
 }
 
+async function fetchConversations(): Promise<ConversationRecord[]> {
+  if (conversationsCache) return conversationsCache;
+  if (!conversationsPromise) {
+    conversationsPromise = (async () => {
+      const { data, error } = await supabase
+        .from("conversations")
+        .select("*")
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      conversationsCache = (data as ConversationRow[]).map(toConversationRecord);
+      return conversationsCache;
+    })();
+    conversationsPromise.catch(() => {
+      conversationsPromise = null;
+    });
+  }
+  return conversationsPromise;
+}
+
+async function fetchMessages(): Promise<MessageRecord[]> {
+  if (messagesCache) return messagesCache;
+  if (!messagesPromise) {
+    messagesPromise = (async () => {
+      const { data, error } = await supabase
+        .from("messages")
+        .select("*")
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      messagesCache = (data as MessageRow[]).map(toMessageRecord);
+      return messagesCache;
+    })();
+    messagesPromise.catch(() => {
+      messagesPromise = null;
+    });
+  }
+  return messagesPromise;
+}
+
 /** Load all store data. Call once at app start; safe to call repeatedly. */
 export async function loadStore(): Promise<void> {
-  await Promise.all([fetchGrants(), fetchExpansions(), fetchNotifications()]);
+  await Promise.all([
+    fetchGrants(),
+    fetchExpansions(),
+    fetchNotifications(),
+    fetchConversations(),
+    fetchMessages(),
+  ]);
   notify();
 }
 
@@ -480,6 +587,91 @@ export function getSeededEmployees(llcId: string): Employee[] {
   return mockEmployees.filter((emp) => emp.llcId === llcId);
 }
 
+// --- Direct messages -----------------------------------------------------------
+
+const ANALYST_CONTACT: { contactType: ContactType; contactName: string } = {
+  contactType: "analyst",
+  contactName: "Dr. Eleanor Cho",
+};
+
+const CPA_CONTACT: { contactType: ContactType; contactName: string } = {
+  contactType: "cpa",
+  contactName: "Cho & Associates CPA PLLC",
+};
+
+export function getConversationsForLLC(llcId: string): ConversationRecord[] {
+  return (conversationsCache ?? []).filter((c) => c.llcId === llcId);
+}
+
+export function getMessagesForConversation(conversationId: string): MessageRecord[] {
+  return (messagesCache ?? [])
+    .filter((m) => m.conversationId === conversationId)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
+export function getUnreadMessageCount(llcId: string): number {
+  const conversationIds = new Set(
+    getConversationsForLLC(llcId).map((c) => c.id)
+  );
+  return (messagesCache ?? []).filter(
+    (m) => conversationIds.has(m.conversationId) && m.sender === "contact" && !m.read
+  ).length;
+}
+
+export async function sendMessage(
+  llcId: string,
+  contactType: ContactType,
+  body: string
+): Promise<MessageRecord> {
+  const trimmed = body.trim();
+  if (!trimmed) throw new Error("Message cannot be empty");
+
+  const contact = contactType === "analyst" ? ANALYST_CONTACT : CPA_CONTACT;
+  const existing = (conversationsCache ?? []).find(
+    (c) => c.llcId === llcId && c.contactType === contactType
+  );
+  let conversation = existing;
+  if (!conversation) {
+    const { data, error } = await supabase
+      .from("conversations")
+      .insert({ llc_id: llcId, contact_type: contact.contactType, contact_name: contact.contactName })
+      .select("*")
+      .single();
+    if (error) throw error;
+    conversation = toConversationRecord(data as ConversationRow);
+    conversationsCache = [...(conversationsCache ?? []), conversation];
+  }
+
+  const { data, error } = await supabase
+    .from("messages")
+    .insert({ conversation_id: conversation.id, sender: "owner", body: trimmed, read: true })
+    .select("*")
+    .single();
+  if (error) throw error;
+  const record = toMessageRecord(data as MessageRow);
+  messagesCache = [...(messagesCache ?? []), record];
+  notify();
+  return record;
+}
+
+/** Marks all contact messages in a conversation as read. */
+export async function markConversationRead(conversationId: string): Promise<void> {
+  const unread = (messagesCache ?? []).filter(
+    (m) => m.conversationId === conversationId && m.sender === "contact" && !m.read
+  );
+  if (unread.length === 0) return;
+  const unreadIds = unread.map((m) => m.id);
+  const { error } = await supabase
+    .from("messages")
+    .update({ read: true })
+    .in("id", unreadIds);
+  if (error) throw error;
+  messagesCache = (messagesCache ?? []).map((m) =>
+    m.conversationId === conversationId && m.sender === "contact" ? { ...m, read: true } : m
+  );
+  notify();
+}
+
 // --- Demo reset ---------------------------------------------------------------
 
 /** Erases every runtime record (grants, expansions, notifications) from the database. */
@@ -492,6 +684,10 @@ export async function resetDemoData(): Promise<void> {
   if (expansionsError) failed.push("pool expansions");
   const { error: notificationsError } = await supabase.from("notifications").delete().neq("id", NIL_UUID);
   if (notificationsError) failed.push("notifications");
+  const { error: messagesError } = await supabase.from("messages").delete().neq("id", NIL_UUID);
+  if (messagesError) failed.push("messages");
+  const { error: conversationsError } = await supabase.from("conversations").delete().neq("id", NIL_UUID);
+  if (conversationsError) failed.push("conversations");
   if (failed.length > 0) {
     throw new Error(`Could not clear ${failed.join(", ")}`);
   }
@@ -501,5 +697,9 @@ export async function resetDemoData(): Promise<void> {
   expansionsPromise = null;
   notificationsCache = [];
   notificationsPromise = null;
+  conversationsCache = [];
+  conversationsPromise = null;
+  messagesCache = [];
+  messagesPromise = null;
   notify();
 }

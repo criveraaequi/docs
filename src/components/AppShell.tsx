@@ -4,11 +4,13 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   getNotifications,
   getUnreadCount,
+  getUnreadMessageCount,
   markNotificationRead,
   resetDemoData,
 } from "@/data/grantStore";
 import { useGrantStore } from "@/data/useGrantStore";
 import type { LLC, LLCAuthorizedUser } from "@/data/types";
+import { MessagesPanel } from "@/components/MessagesPanel";
 
 interface AppShellProps {
   llc: LLC;
@@ -19,6 +21,7 @@ interface AppShellProps {
 export function AppShell({ llc, owner, children }: AppShellProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [messagesOpen, setMessagesOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
@@ -29,6 +32,7 @@ export function AppShell({ llc, owner, children }: AppShellProps) {
 
   const notifications = getNotifications(llc.id);
   const unread = getUnreadCount(llc.id);
+  const unreadMessages = getUnreadMessageCount(llc.id);
 
   useEffect(() => {
     if (!notifOpen) return;
@@ -130,8 +134,14 @@ export function AppShell({ llc, owner, children }: AppShellProps) {
               </div>
             )}
           </div>
-          <button className="icon-button" type="button" aria-label="Messages">
+          <button
+            className="icon-button message-button"
+            type="button"
+            aria-label={unreadMessages > 0 ? `${unreadMessages} unread messages` : "Messages"}
+            onClick={() => setMessagesOpen(true)}
+          >
             <MessageSquare size={18} strokeWidth={1.7} />
+            {unreadMessages > 0 && <span className="notification-dot" />}
           </button>
           <div className="notification-wrap" ref={notifRef}>
             <button
@@ -197,6 +207,7 @@ export function AppShell({ llc, owner, children }: AppShellProps) {
         </nav>
       </header>
       <main className="page-content">{children}</main>
+      {messagesOpen && <MessagesPanel llcId={llc.id} onClose={() => setMessagesOpen(false)} />}
     </div>
   );
 }
