@@ -343,6 +343,8 @@
   border: 1px solid rgba(173, 95, 62, 0.4); background: rgba(173, 95, 62, 0.08);
   color: #ad5f3e; border-radius: 6px; padding: 10px 14px; font-size: 0.84rem; line-height: 1.5;
 }
+.wizard-error a { color: #ad5f3e; font-weight: 600; text-decoration: underline; }
+.wizard-error a:hover { color: #8f4730; }
 
 .wizard-length-options { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
 .wizard-length-option {

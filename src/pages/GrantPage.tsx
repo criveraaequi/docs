@@ -259,8 +259,8 @@ export function GrantPage({ llcId }: GrantPageProps) {
             </div>
             {unitsOverPool && (
               <p className="wizard-error">
-                Not enough units left in the pool — only {remainingUnits.toLocaleString()} remain.
-                You'll be able to expand the pool from the dashboard.
+                Insufficient units left in the pool — only {remainingUnits.toLocaleString()} remain.
+                You can expand the phantom pool <Link to="/pool/expand">here</Link>.
               </p>
             )}
             {pendingUnitsForEmployee > 0 && (
