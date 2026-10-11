@@ -167,11 +167,21 @@ function buildVestingPreview(
 
   const points: VestingPreviewPoint[] = [];
   let vested = 0;
-  let recoveryDebt = 0;
+  let shortfall = 0;
+  const totalVestingMonths = Math.max(lengthMonths - cliffMonths, 1);
   for (let month = 0; month <= lengthMonths; month += 1) {
-    if (month >= cliffMonths) {
-      vested += (baseMonthlyRate + recoveryDebt) * paceAt(month);
-      recoveryDebt += baseMonthlyRate * (1 - paceAt(month));
+    // One payment per month starting at the cliff month, up to the scheduled
+    // number of payments; the completion month is the point where the chart
+    // lands on 100%.
+    if (month >= cliffMonths && month < lengthMonths) {
+      const index = month - cliffMonths;
+      const remainingMonths = Math.max(totalVestingMonths - index, 1);
+      // Spread the accrued shortfall evenly over the months still left, so
+      // vesting lands exactly on 100% at the original completion date.
+      const catchUp = shortfall / remainingMonths;
+      const monthVest = (baseMonthlyRate + catchUp) * paceAt(month);
+      vested += monthVest;
+      shortfall += baseMonthlyRate - monthVest;
     }
     const triggerUnits = triggers.reduce(
       (sum, trigger) =>

@@ -85,19 +85,26 @@ export function vestedUnitsAsOf(
     }
   }
 
-  // Walk each elapsed month after the cliff, applying the slowest applicable
-  // pace. Slowed months vest less now and their shortfall (recoveryDebt) is
-  // added to later months, so the award still reaches 100% on the original date.
-  let recoveryDebt = 0;
+  // One payment per month starting at the cliff month, up to the scheduled
+  // number of payments. Slowed months vest less now; their shortfall is
+  // spread evenly over the months still remaining, so the award still
+  // reaches 100% on the original completion date without over-vesting
+  // in between.
+  let shortfall = 0;
   for (let month = cliffMonths; month <= monthsElapsed; month += 1) {
+    const index = month - cliffMonths;
+    if (index >= totalVestingMonths) break;
     let pace = 1;
     for (const slowdown of slowdowns) {
       if (month >= slowdown.fromMonth && month < slowdown.toMonth) {
         pace = Math.min(pace, slowdown.paceMultiplier);
       }
     }
-    vested += (baseMonthlyRate + recoveryDebt) * pace;
-    recoveryDebt += baseMonthlyRate * (1 - pace);
+    const remainingMonths = Math.max(totalVestingMonths - index, 1);
+    const catchUp = shortfall / remainingMonths;
+    const monthVest = (baseMonthlyRate + catchUp) * pace;
+    vested += monthVest;
+    shortfall += baseMonthlyRate - monthVest;
   }
   return Math.min(Math.round(vested), unitsAwarded);
 }
