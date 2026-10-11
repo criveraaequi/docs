@@ -648,6 +648,48 @@
 .total-caption { color: var(--slate); font-size: 12px; line-height: 1.5; margin: 14px 0 0; }
 .grant-agreement-card .payout-projected { margin: 18px 0 0; padding-top: 14px; border-top: 1px solid var(--card-border); }
 
+/* --- Collapsible agreement disclosures ------------------------------------- */
+
+.disclosure-toggle {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 4px 4px 8px;
+  margin: -4px -4px -8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+.disclosure-bullet {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(31, 49, 100, 0.08);
+  color: #1f3164;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.disclosure-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.disclosure-title .eyebrow { margin-bottom: 0; }
+.disclosure-title strong { font-size: 14px; font-weight: 600; color: var(--ink, #1c2433); }
+.disclosure-meta {
+  margin-left: auto;
+  color: var(--slate);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.disclosure-chevron { color: var(--slate); flex-shrink: 0; transition: transform 0.2s ease; }
+.grant-agreement-card.disclosure-open .disclosure-chevron { transform: rotate(180deg); }
+.disclosure-open .card-heading { margin-bottom: 20px; padding-top: 18px; border-top: 1px solid var(--card-border); }
+
 /* --- Responsive ------------------------------------------------------------ */
 
 @media (max-width: 720px) {

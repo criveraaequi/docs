@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowUpRight } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, ChevronDown } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
@@ -147,6 +147,7 @@ export function EmployeeDetailPage() {
   const llc = employee ? getLLCDetails(employee.llcId) : null;
   const owner = llc ? getAuthorizedUser(llc.id) : null;
   const [showValue, setShowValue] = useState(true);
+  const [expandedAgreements, setExpandedAgreements] = useState<Set<string>>(new Set());
 
   const runtimeGrants = employeeId ? getGrantsForEmployee(employeeId) : [];
 
@@ -242,12 +243,21 @@ export function EmployeeDetailPage() {
         <TotalVestingCard views={liveViews} history={history} showValue={showValue} />
 
         {liveViews.map((view, index) => (
-          <GrantAgreementCard
+          <AgreementDisclosure
             key={view.key}
             index={index}
             view={view}
             history={history}
             showValue={showValue}
+            expanded={expandedAgreements.has(view.key)}
+            onToggle={() =>
+              setExpandedAgreements((current) => {
+                const next = new Set(current);
+                if (next.has(view.key)) next.delete(view.key);
+                else next.add(view.key);
+                return next;
+              })
+            }
           />
         ))}
       </div>
@@ -418,6 +428,50 @@ interface GrantAgreementCardProps {
   showValue: boolean;
 }
 
+/** Collapsible summary row for one agreement; the full card is revealed on click. */
+function AgreementDisclosure({
+  index,
+  view,
+  history,
+  showValue,
+  expanded,
+  onToggle,
+}: {
+  index: number;
+  view: GrantView & { vestedUnits: number; vestedValue: number };
+  history: ValuationEvent[];
+  showValue: boolean;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const { grant, status } = view;
+  const summary =
+    status === "pending"
+      ? "Awaiting signature"
+      : `${formatYears(grant.vesting.scheduleLengthMonths)} schedule`;
+
+  return (
+    <section className={`card grant-agreement-card${expanded ? " disclosure-open" : ""}`}>
+      <button className="disclosure-toggle" type="button" aria-expanded={expanded} onClick={onToggle}>
+        <span className="disclosure-bullet">{index + 1}</span>
+        <span className="disclosure-title">
+          <span className="eyebrow">Agreement {index + 1}</span>
+          <strong>
+            {grant.unitsAwarded.toLocaleString()} units · {summary}
+          </strong>
+        </span>
+        <span className="disclosure-meta">
+          {formatDate(grant.vesting.cliffDate)} — {formatDate(grant.vesting.vestingCompletionDate)}
+        </span>
+        <ChevronDown size={16} className="disclosure-chevron" />
+      </button>
+      {expanded && (
+        <GrantAgreementCard index={index} view={view} history={history} showValue={showValue} />
+      )}
+    </section>
+  );
+}
+
 function GrantAgreementCard({ index, view, history, showValue }: GrantAgreementCardProps) {
   const { grant, status, contractId } = view;
   const today = todayIso();
@@ -464,7 +518,7 @@ function GrantAgreementCard({ index, view, history, showValue }: GrantAgreementC
   const cliffMarkers: CliffMarker[] = cliffPoint ? [{ label: cliffPoint.label, text: "CLIFF" }] : [];
 
   return (
-    <section className="card grant-agreement-card">
+    <>
       <div className="card-heading">
         <div>
           <span className="eyebrow">Agreement {index + 1}</span>
@@ -537,6 +591,6 @@ function GrantAgreementCard({ index, view, history, showValue }: GrantAgreementC
           <span> — all {grant.unitsAwarded.toLocaleString()} units × ${currentPrice.toFixed(2)} current unit price</span>
         </p>
       )}
-    </section>
+    </>
   );
 }
