@@ -13,12 +13,12 @@ import { useGrantStore } from "@/data/useGrantStore";
 
 const LLC_ID = "llc-1";
 
-type ContractSort = "date-earliest" | "alphabetical" | "size";
+type ContractSort = "date-latest" | "alphabetical" | "size";
 
 const CONTRACT_SORT_OPTIONS: { label: string; value: ContractSort }[] = [
-  { label: "Earliest to latest issue date", value: "date-earliest" },
+  { label: "Issue date (latest to earliest)", value: "date-latest" },
+  { label: "Contract size (largest to smallest)", value: "size" },
   { label: "Alphabetical (A–Z)", value: "alphabetical" },
-  { label: "Largest contract size", value: "size" },
 ];
 
 function sortContractEntries(entries: ContractEntry[], sort: ContractSort): ContractEntry[] {
@@ -28,8 +28,8 @@ function sortContractEntries(entries: ContractEntry[], sort: ContractSort): Cont
       return sorted.sort((a, b) => a.name.localeCompare(b.name));
     case "size":
       return sorted.sort((a, b) => b.units - a.units);
-    case "date-earliest":
-      return sorted.sort((a, b) => a.grantDate.localeCompare(b.grantDate));
+    case "date-latest":
+      return sorted.sort((a, b) => b.grantDate.localeCompare(a.grantDate));
   }
 }
 
@@ -46,7 +46,7 @@ interface ContractEntry {
 export function ContractsPage() {
   const llc = getLLCDetails(LLC_ID);
   const owner = llc ? getAuthorizedUser(llc.id) : null;
-  const [sort, setSort] = useState<ContractSort>("date-earliest");
+  const [sort, setSort] = useState<ContractSort>("date-latest");
   useGrantStore();
 
   if (!llc) {
