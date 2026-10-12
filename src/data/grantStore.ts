@@ -790,6 +790,35 @@ export async function sendEmployeeMessage(
   return record;
 }
 
+/** Opens (or finds) the private owner-to-employee thread. */
+export async function startEmployerConversation(
+  llcId: string,
+  employeeId: string
+): Promise<ConversationRecord> {
+  return ensureEmployeeConversation(llcId, employeeId, "employer");
+}
+
+/** Owner sends a message on a private owner-to-employee thread. */
+export async function sendOwnerToEmployeeMessage(
+  llcId: string,
+  employeeId: string,
+  body: string
+): Promise<MessageRecord> {
+  const trimmed = body.trim();
+  if (!trimmed) throw new Error("Message cannot be empty");
+  const conversation = await ensureEmployeeConversation(llcId, employeeId, "employer");
+  const { data, error } = await supabase
+    .from("messages")
+    .insert({ conversation_id: conversation.id, sender: "owner", body: trimmed, read: true })
+    .select("*")
+    .single();
+  if (error) throw error;
+  const record = toMessageRecord(data as MessageRow);
+  messagesCache = [...(messagesCache ?? []), record];
+  notify();
+  return record;
+}
+
 export function getEmployeeMessages(
   llcId: string,
   employeeId: string,

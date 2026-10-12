@@ -2,15 +2,20 @@
 // Renders as a popup overlay from the top bar, expandable to fullscreen.
 // One ongoing thread per contact per LLC.
 
-import { Maximize2, Minimize2, Send, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";import {
+import { ChevronDown, Maximize2, Minimize2, Send, Users, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
   getConversationsForLLC,
   getMessagesForConversation,
   getUnreadMessageCount,
   markConversationRead,
   sendMessage,
+  sendOwnerToEmployeeMessage,
+  startEmployerConversation,
 } from "@/data/grantStore";
 import { useGrantStore } from "@/data/useGrantStore";
+import { getEmployeeRecordById, getEmployeeRecords } from "@/data/employeeStore";
+import type { EmployeeRecord } from "@/data/employeeStore";
 import type { ContactType, MessageRecord } from "@/data/grantStore";
 
 interface MessagesPanelProps {
@@ -60,14 +65,31 @@ export function MessagesPanel({ llcId, onClose }: MessagesPanelProps) {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [employeesOpen, setEmployeesOpen] = useState(false);
+  const [startingChat, setStartingChat] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const conversations = getConversationsForLLC(llcId);
   const unreadTotal = getUnreadMessageCount(llcId);
   const selected = conversations.find((c) => c.id === selectedId) ?? null;
+  const selectedEmployee = selected?.employeeId
+    ? getEmployeeRecordById(selected.employeeId)
+    : null;
   const messages = useMemo(
     () => (selected ? getMessagesForConversation(selected.id) : []),
     [selected]
+  );
+
+  // Employees who don't have a thread yet — once a conversation starts they
+  // move up into the conversation list and leave this picker.
+  const activeEmployees = getEmployeeRecords().filter(
+    (employee) => employee.employmentStatus === "active"
+  );
+  const employeesWithThreads = new Set(
+    conversations.map((c) => c.employeeId).filter((id): id is string => id !== null)
+  );
+  const availableEmployees = activeEmployees.filter(
+    (employee) => !employeesWithThreads.has(employee.id)
   );
 
   // Open the most recent unread conversation (or the first one) by default.
@@ -102,12 +124,30 @@ export function MessagesPanel({ llcId, onClose }: MessagesPanelProps) {
     setSendError(null);
     setSending(true);
     try {
-      await sendMessage(llcId, selected.contactType, draft);
+      if (selected.employeeId) {
+        await sendOwnerToEmployeeMessage(llcId, selected.employeeId, draft);
+      } else {
+        await sendMessage(llcId, selected.contactType, draft);
+      }
       setDraft("");
     } catch {
       setSendError("Couldn't send the message. Check your connection and try again.");
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleStartChat = async (employee: EmployeeRecord) => {
+    if (startingChat) return;
+    setStartingChat(employee.id);
+    try {
+      const conversation = await startEmployerConversation(llcId, employee.id);
+      setSelectedId(conversation.id);
+      setEmployeesOpen(false);
+    } catch {
+      setSendError("Couldn't start the conversation. Check your connection and try again.");
+    } finally {
+      setStartingChat(null);
     }
   };
 
@@ -152,16 +192,14 @@ export function MessagesPanel({ llcId, onClose }: MessagesPanelProps) {
           </div>
         </header>
 
-        {conversations.length === 0 ? (
-          <div className="messages-empty">
-            <p>No conversations yet.</p>
-            <small>
-              Your assigned Aequi analyst and CPA firm will appear here once an engagement begins.
-            </small>
-          </div>
-        ) : (
-          <div className="messages-body">
+        <div className="messages-body">
+          <div className="conversation-column">
             <ul className="conversation-list">
+              {conversations.length === 0 && (
+                <li className="conversation-empty-note">
+                  No conversations yet — pick an employee below or wait for your analyst to reach out.
+                </li>
+              )}
               {conversations.map((conversation) => {
                 const thread = getMessagesForConversation(conversation.id);
                 const last = thread[thread.length - 1];
@@ -189,6 +227,48 @@ export function MessagesPanel({ llcId, onClose }: MessagesPanelProps) {
               })}
             </ul>
 
+            <div className={`employees-picker${employeesOpen ? " is-open" : ""}`}>
+              <button
+                className="employees-picker-toggle"
+                type="button"
+                aria-expanded={employeesOpen}
+                onClick={() => setEmployeesOpen((open) => !open)}
+              >
+                <Users size={14} />
+                <span>Employees</span>
+                <ChevronDown size={14} className="employees-picker-chevron" />
+              </button>
+              {employeesOpen && (
+                <ul className="employees-picker-list">
+                  {availableEmployees.length === 0 && (
+                    <li className="employees-picker-note">
+                      {activeEmployees.length === 0
+                        ? "Add employees from the Employees page first."
+                        : "You're chatting with everyone on the team."}
+                    </li>
+                  )}
+                  {availableEmployees.map((employee) => (
+                    <li key={employee.id}>
+                      <button
+                        className="employees-picker-item"
+                        type="button"
+                        disabled={startingChat !== null}
+                        onClick={() => void handleStartChat(employee)}
+                      >
+                        <span className="conversation-avatar employees-picker-avatar">
+                          {employee.name.slice(0, 1)}
+                        </span>
+                        <span className="employees-picker-meta">
+                          <strong>{employee.name}</strong>
+                          <small>{employee.roleOrPosition}</small>
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
             <div className="thread-pane">
               {selected ? (
                 <>
@@ -196,7 +276,11 @@ export function MessagesPanel({ llcId, onClose }: MessagesPanelProps) {
                     <span className="thread-avatar">{selected.contactName.slice(0, 1)}</span>
                     <div>
                       <strong>{selected.contactName}</strong>
-                      <small>{CONTACT_META[selected.contactType].role}</small>
+                      <small>
+                        {selectedEmployee
+                          ? selectedEmployee.roleOrPosition
+                          : CONTACT_META[selected.contactType].role}
+                      </small>
                     </div>
                   </div>
                   <div className="thread-scroll" ref={scrollRef}>
@@ -246,8 +330,7 @@ export function MessagesPanel({ llcId, onClose }: MessagesPanelProps) {
                 </div>
               )}
             </div>
-          </div>
-        )}
+        </div>
       </section>
     </div>
   );
