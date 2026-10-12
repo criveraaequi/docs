@@ -6,14 +6,12 @@
 // overridden by the latest approved pool expansion.
 
 import { supabase } from "./supabaseClient";
-import {
-  mockEmployees,
-  mockLLCs,
-} from "./mockData";
+import { getEmployeeRecordById } from "./employeeStore";
+import { mockLLCs } from "./mockData";
 import { todayIso } from "./vesting";
-import type { Employee, VestingSlowdown, VestingTrigger } from "./types";
+import type { VestingSlowdown, VestingTrigger } from "./types";
 
-export type GrantStatus = "pending" | "active";
+export type GrantStatus = "pending" | "active" | "rejected";
 
 export interface GrantRecord {
   id: string;
@@ -67,10 +65,12 @@ export interface ConversationRecord {
   llcId: string;
   contactType: ContactType;
   contactName: string;
+  /** null = the LLC owner's thread; set = a private thread for that employee */
+  employeeId: string | null;
   createdAt: string;
 }
 
-export type MessageSender = "owner" | "contact";
+export type MessageSender = "owner" | "contact" | "employee";
 
 export interface MessageRecord {
   id: string;
@@ -131,6 +131,7 @@ interface ConversationRow {
   llc_id: string;
   contact_type: string;
   contact_name: string;
+  employee_id: string | null;
   created_at: string;
 }
 
@@ -198,6 +199,7 @@ function toConversationRecord(row: ConversationRow): ConversationRecord {
     llcId: row.llc_id,
     contactType: row.contact_type as ContactType,
     contactName: row.contact_name,
+    employeeId: row.employee_id,
     createdAt: row.created_at,
   };
 }
@@ -384,7 +386,7 @@ export async function createGrant(input: {
   vestingTriggers?: VestingTrigger[];
   vestingSlowdowns?: VestingSlowdown[];
 }): Promise<GrantRecord> {
-  const employee = mockEmployees.find((emp) => emp.id === input.employeeId);
+  const employee = getEmployeeRecordById(input.employeeId);
   if (!employee) throw new Error("Employee not found");
 
   const grantDate = todayIso();
@@ -424,8 +426,12 @@ export async function createGrant(input: {
   return record;
 }
 
-/** Simulated employee signature: pending -> active, plus bell notification. */
-export async function signGrant(grantId: string): Promise<void> {
+/**
+ * Employee decision on a pending grant: accept activates the agreement and
+ * notifies the owner; reject sends it back and notifies the owner. This is
+ * the only path from pending to active — the owner-side simulate button is gone.
+ */
+export async function acceptGrant(grantId: string): Promise<void> {
   const grant = getGrantById(grantId);
   if (!grant || grant.status !== "pending") return;
 
@@ -453,6 +459,86 @@ export async function signGrant(grantId: string): Promise<void> {
   if (!notificationError && data) {
     notificationsCache = [toNotificationRecord(data as NotificationRow), ...(notificationsCache ?? [])];
   }
+  notify();
+}
+
+export async function rejectGrant(grantId: string): Promise<void> {
+  const grant = getGrantById(grantId);
+  if (!grant || grant.status !== "pending") return;
+
+  const { error } = await supabase
+    .from("grants")
+    .update({ status: "rejected" })
+    .eq("id", grantId);
+  if (error) throw error;
+
+  grantsCache = (grantsCache ?? []).map((grant) =>
+    grant.id === grantId ? { ...grant, status: "rejected" as const } : grant
+  );
+
+  const notification = {
+    llc_id: grant.llcId,
+    grant_id: grant.id,
+    message: `${grant.employeeName} declined the Equity Agreement Contract`,
+  };
+  const { data, error: notificationError } = await supabase
+    .from("notifications")
+    .insert(notification)
+    .select("*")
+    .single();
+  if (!notificationError && data) {
+    notificationsCache = [toNotificationRecord(data as NotificationRow), ...(notificationsCache ?? [])];
+  }
+  notify();
+}
+
+/**
+ * Owner revision of a rejected grant: updated terms go back to the employee
+ * as a fresh pending agreement awaiting their decision.
+ */
+export async function resendGrant(
+  grantId: string,
+  input: {
+    unitsAwarded: number;
+    scheduleLengthMonths: number;
+    cliffMonths?: number;
+  }
+): Promise<void> {
+  const grant = getGrantById(grantId);
+  if (!grant || grant.status !== "rejected") return;
+
+  const cliffMonths = Math.min(input.cliffMonths ?? 12, Math.max(input.scheduleLengthMonths - 1, 1));
+  const cliff = new Date(grant.grantDate);
+  cliff.setMonth(cliff.getMonth() + cliffMonths);
+  const completion = new Date(grant.grantDate);
+  completion.setMonth(completion.getMonth() + input.scheduleLengthMonths);
+
+  const { error } = await supabase
+    .from("grants")
+    .update({
+      units_awarded: input.unitsAwarded,
+      schedule_length_months: input.scheduleLengthMonths,
+      cliff_date: cliff.toISOString().slice(0, 10),
+      vesting_completion_date: completion.toISOString().slice(0, 10),
+      monthly_vesting_rate: input.unitsAwarded / Math.max(input.scheduleLengthMonths - cliffMonths, 1),
+      status: "pending",
+    })
+    .eq("id", grantId);
+  if (error) throw error;
+
+  grantsCache = (grantsCache ?? []).map((grant) =>
+    grant.id === grantId
+      ? {
+          ...grant,
+          unitsAwarded: input.unitsAwarded,
+          scheduleLengthMonths: input.scheduleLengthMonths,
+          cliffDate: cliff.toISOString().slice(0, 10),
+          vestingCompletionDate: completion.toISOString().slice(0, 10),
+          monthlyVestingRate: input.unitsAwarded / Math.max(input.scheduleLengthMonths - cliffMonths, 1),
+          status: "pending" as const,
+        }
+      : grant
+  );
   notify();
 }
 
@@ -577,16 +663,6 @@ export async function markNotificationRead(id: string): Promise<void> {
   notify();
 }
 
-// --- Employees (seed + runtime merge) -------------------------------------------
-
-/**
- * All seeded employees for an LLC. Runtime grants do not change the employee
- * record itself — they attach via getGrantsForEmployee.
- */
-export function getSeededEmployees(llcId: string): Employee[] {
-  return mockEmployees.filter((emp) => emp.llcId === llcId);
-}
-
 // --- Direct messages -----------------------------------------------------------
 
 const ANALYST_CONTACT: { contactType: ContactType; contactName: string } = {
@@ -600,7 +676,7 @@ const CPA_CONTACT: { contactType: ContactType; contactName: string } = {
 };
 
 export function getConversationsForLLC(llcId: string): ConversationRecord[] {
-  return (conversationsCache ?? []).filter((c) => c.llcId === llcId);
+  return (conversationsCache ?? []).filter((c) => c.llcId === llcId && c.employeeId === null);
 }
 
 export function getMessagesForConversation(conversationId: string): MessageRecord[] {
@@ -652,6 +728,109 @@ export async function sendMessage(
   messagesCache = [...(messagesCache ?? []), record];
   notify();
   return record;
+}
+
+/**
+ * Finds or creates the single ongoing thread between one employee and one
+ * contact (analyst/CPA) within an LLC. Employee threads are private — the
+ * owner's conversation list excludes them.
+ */
+async function ensureEmployeeConversation(
+  llcId: string,
+  employeeId: string,
+  contactType: ContactType
+): Promise<ConversationRecord> {
+  const existing = (conversationsCache ?? []).find(
+    (c) =>
+      c.llcId === llcId &&
+      c.contactType === contactType &&
+      c.employeeId === employeeId
+  );
+  if (existing) return existing;
+
+  const contact = contactType === "analyst" ? ANALYST_CONTACT : CPA_CONTACT;
+  const { data, error } = await supabase
+    .from("conversations")
+    .insert({
+      llc_id: llcId,
+      contact_type: contact.contactType,
+      contact_name: contact.contactName,
+      employee_id: employeeId,
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+  const conversation = toConversationRecord(data as ConversationRow);
+  conversationsCache = [...(conversationsCache ?? []), conversation];
+  return conversation;
+}
+
+export async function sendEmployeeMessage(
+  llcId: string,
+  employeeId: string,
+  contactType: ContactType,
+  body: string
+): Promise<MessageRecord> {
+  const trimmed = body.trim();
+  if (!trimmed) throw new Error("Message cannot be empty");
+  const conversation = await ensureEmployeeConversation(llcId, employeeId, contactType);
+  const { data, error } = await supabase
+    .from("messages")
+    .insert({ conversation_id: conversation.id, sender: "employee", body: trimmed, read: true })
+    .select("*")
+    .single();
+  if (error) throw error;
+  const record = toMessageRecord(data as MessageRow);
+  messagesCache = [...(messagesCache ?? []), record];
+  notify();
+  return record;
+}
+
+export function getEmployeeMessages(
+  llcId: string,
+  employeeId: string,
+  contactType: ContactType
+): MessageRecord[] {
+  const conversation = (conversationsCache ?? []).find(
+    (c) =>
+      c.llcId === llcId &&
+      c.contactType === contactType &&
+      c.employeeId === employeeId
+  );
+  if (!conversation) return [];
+  return getMessagesForConversation(conversation.id);
+}
+
+export function getEmployeeUnreadMessageCount(
+  llcId: string,
+  employeeId: string,
+  contactType: ContactType
+): number {
+  const conversation = (conversationsCache ?? []).find(
+    (c) =>
+      c.llcId === llcId &&
+      c.contactType === contactType &&
+      c.employeeId === employeeId
+  );
+  if (!conversation) return 0;
+  return (messagesCache ?? []).filter(
+    (m) => m.conversationId === conversation.id && m.sender === "contact" && !m.read
+  ).length;
+}
+
+export async function markEmployeeConversationRead(
+  llcId: string,
+  employeeId: string,
+  contactType: ContactType
+): Promise<void> {
+  const conversation = (conversationsCache ?? []).find(
+    (c) =>
+      c.llcId === llcId &&
+      c.contactType === contactType &&
+      c.employeeId === employeeId
+  );
+  if (!conversation) return;
+  await markConversationRead(conversation.id);
 }
 
 /** Marks all contact messages in a conversation as read. */

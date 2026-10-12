@@ -631,8 +631,114 @@
 .runtime-grant-row strong { font-size: 0.92rem; color: #23272f; }
 .runtime-grant-row span { font-size: 0.78rem; color: #8a93a3; }
 .runtime-grant-meta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
-.simulate-sign-button { border-color: rgba(176, 125, 58, 0.5); color: #b07d3a; }
-.simulate-sign-button:hover { background: rgba(176, 125, 58, 0.08); }
+.payout-projected-warning { color: #a5511f; }
+
+/* --- View-as switcher (pre-auth identity stand-in) ------------------------- */
+
+.view-as-current {
+  color: var(--amber, #b07d3a);
+  font-weight: 600;
+}
+.view-as-menu {
+  right: 0;
+  min-width: 240px;
+}
+.view-as-heading {
+  font: 600 10px/1 var(--font-sans);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--slate, #6b7280);
+  margin: 0 0 10px;
+}
+.view-as-option {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 9px 10px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  transition: background 0.15s ease;
+}
+.view-as-option:hover { background: rgba(31, 49, 100, 0.06); }
+.view-as-option.is-current { background: rgba(176, 125, 58, 0.1); }
+.view-as-option strong { font-size: 13px; color: var(--navy, #1f3164); }
+.view-as-option span { font-size: 11px; color: var(--slate, #6b7280); }
+
+/* --- Employee portal -------------------------------------------------------- */
+
+.payout-price-note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--slate, #6b7280);
+  font-size: 13px;
+}
+.payout-price-note strong { color: var(--navy, #1f3164); }
+.preliminary-pill {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(176, 125, 58, 0.14);
+  color: #8a6427;
+  font: 600 11px/1.3 var(--font-sans);
+  letter-spacing: 0.03em;
+}
+.employee-decision {
+  margin-top: 18px;
+  padding: 16px 18px;
+  border: 1px solid rgba(176, 125, 58, 0.4);
+  border-radius: 8px;
+  background: rgba(176, 125, 58, 0.06);
+  display: grid;
+  gap: 12px;
+}
+.employee-decision p { margin: 0; font-size: 13px; line-height: 1.5; color: #4b5563; }
+.employee-decision-actions { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+.revision-fields { display: grid; gap: 12px; }
+.contract-collapse {
+  margin-top: 18px;
+  border-top: 1px solid var(--card-border, rgba(31, 49, 100, 0.14));
+  padding-top: 14px;
+}
+.contract-collapse > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  color: var(--navy, #1f3164);
+  font-size: 13px;
+  font-weight: 600;
+  list-style: none;
+}
+.contract-collapse > summary::-webkit-details-marker { display: none; }
+.contract-collapse > summary:hover { text-decoration: underline; }
+.contract-collapse[open] > summary { margin-bottom: 18px; }
+.employee-valuation-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.employee-valuation-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 4px;
+  border-bottom: 1px solid var(--card-border, rgba(31, 49, 100, 0.1));
+}
+.employee-valuation-row:last-child { border-bottom: none; }
+.employee-valuation-row > div:first-child { display: flex; flex-direction: column; gap: 2px; }
+.employee-valuation-row strong { font-size: 0.92rem; color: #23272f; }
+.employee-valuation-row span { font-size: 0.78rem; color: #8a93a3; }
+.employee-valuation-figures { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.employee-valuation-figures strong { color: var(--navy, #1f3164); }
+.employee-analyst-note {
+  margin: 16px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--card-border, rgba(31, 49, 100, 0.1));
+  color: var(--slate, #6b7280);
+  font-size: 12px;
+}
+.employee-analyst-note strong { color: var(--navy, #1f3164); }
 
 .status-pending {
   background: rgba(176, 125, 58, 0.14); color: #8a6427;

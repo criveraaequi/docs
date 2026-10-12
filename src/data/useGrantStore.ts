@@ -1,6 +1,7 @@
 // Aequi — React hook to re-render when the grant store changes.
 import { useEffect, useSyncExternalStore } from "react";
 import { getStoreVersion, loadStore, subscribeStore } from "./grantStore";
+import { loadEmployees } from "./employeeStore";
 
 let loadStarted = false;
 
@@ -8,7 +9,7 @@ let loadStarted = false;
 export function ensureStoreLoaded(): void {
   if (!loadStarted) {
     loadStarted = true;
-    loadStore().catch((error) => {
+    Promise.all([loadStore(), loadEmployees()]).catch((error) => {
       loadStarted = false;
       console.error("Failed to load store", error);
     });

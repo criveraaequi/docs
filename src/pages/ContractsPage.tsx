@@ -6,9 +6,8 @@ import { AppShell } from "@/components/AppShell";
 import { formatDate } from "@/components/ValuationDetailModal";
 import {
   getGrantsForLLC,
-  getSeededEmployees,
 } from "@/data/grantStore";
-import { getAuthorizedUser, getLLCDetails } from "@/data/mockApi";
+import { getAuthorizedUser, getEmployeesByLLC, getLLCDetails } from "@/data/mockApi";
 import { useGrantStore } from "@/data/useGrantStore";
 
 const LLC_ID = "llc-1";
@@ -59,7 +58,7 @@ export function ContractsPage() {
   }
 
   // Seeded employees already have signed contracts (no bell activity for them).
-  const seededEntries: ContractEntry[] = getSeededEmployees(LLC_ID)
+  const seededEntries: ContractEntry[] = getEmployeesByLLC(LLC_ID)
     .filter((employee) => employee.grant !== null)
     .map((employee) => ({
       key: `seeded-${employee.id}`,

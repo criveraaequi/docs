@@ -11,6 +11,7 @@ import {
 import { useGrantStore } from "@/data/useGrantStore";
 import type { LLC, LLCAuthorizedUser } from "@/data/types";
 import { MessagesPanel } from "@/components/MessagesPanel";
+import { ViewAsSwitcher } from "@/components/ViewAsSwitcher";
 
 interface AppShellProps {
   llc: LLC;
@@ -92,6 +93,7 @@ export function AppShell({ llc, owner, children }: AppShellProps) {
           {isMenuOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
         <nav className={`topbar-actions ${isMenuOpen ? "is-open" : ""}`}>
+          <ViewAsSwitcher />
           <Link className="header-action" to="/contracts">
             <FileText size={16} strokeWidth={1.7} />
             <span>Contracts</span>

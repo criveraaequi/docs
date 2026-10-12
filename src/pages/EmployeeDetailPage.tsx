@@ -15,7 +15,6 @@ import { AppShell } from "@/components/AppShell";
 import { formatDate } from "@/components/ValuationDetailModal";
 import {
   getGrantsForEmployee,
-  signGrant,
   type GrantRecord,
 } from "@/data/grantStore";
 import { getAuthorizedUser, getEmployee, getLLCDetails } from "@/data/mockApi";
@@ -135,7 +134,7 @@ function formatYears(months: number): string {
 interface GrantView {
   key: string;
   grant: EquityGrant;
-  status: "pending" | "active";
+  status: "pending" | "active" | "rejected";
   /** For runtime agreements: link to the contract document. */
   contractId?: string;
 }
@@ -573,15 +572,15 @@ function GrantAgreementCard({ index, view, history, showValue }: GrantAgreementC
       </div>
 
       {status === "pending" && (
-        <div className="pending-sign-row">
-          <button
-            className="button-secondary simulate-sign-button"
-            type="button"
-            onClick={() => void signGrant(contractId!)}
-          >
-            Simulate employee signing (demo)
-          </button>
-        </div>
+        <p className="payout-projected">
+          Awaiting the employee's decision — they can accept or decline this agreement in their
+          own portal.
+        </p>
+      )}
+      {status === "rejected" && (
+        <p className="payout-projected payout-projected-warning">
+          Declined by the employee — revise the terms and re-send, or withdraw this offer.
+        </p>
       )}
 
       {stillInCliff && (

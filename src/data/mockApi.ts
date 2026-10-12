@@ -5,24 +5,33 @@
 import type {
   Analyst,
   AnalystLLCEngagement,
-  Employee,
   EngagementStage,
-  LLCAuthorizedUser,
-  LLC,
   PlatformAdmin,
   UnitHolderSegment,
   ValuationEvent,
 } from "./types";
 import {
+  getEmployeeRecords,
+  getEmployeeRecordById,
+  getEmployeeRecordsForLLC,
+  type EmployeeRecord,
+} from "./employeeStore";
+import {
   mockAnalysts,
   mockAuthorizedUsers,
-  mockEmployees,
   mockEngagements,
   mockLLCs,
   mockPlatformAdmins,
 } from "./mockData";
 import { getEffectivePool, getGrantsForEmployee } from "./grantStore";
-import { employeeVestedPayout, employeeVestedUnits } from "./vesting";
+import type { Employee, LLCAuthorizedUser, LLC } from "./types";
+import {
+  employeeVestedPayout,
+  employeeVestedUnits,
+  fullMonthsBetween,
+  strikePriceAt,
+  todayIso,
+} from "./vesting";
 
 // ---------------------------------------------------------------------------
 // LLC queries
@@ -61,26 +70,51 @@ export function getCurrentStrikePrice(llcId: string): number | null {
 // Employee / Grant queries
 // ---------------------------------------------------------------------------
 
+/** Maps a DB employee record to the Employee shape screens use. */
+function recordToEmployee(record: EmployeeRecord): Employee {
+  return {
+    id: record.id,
+    name: record.name,
+    roleOrPosition: record.roleOrPosition,
+    tenureYears: Math.round((fullMonthsBetween(record.startDate, todayIso()) / 12) * 10) / 10,
+    employmentStatus: record.employmentStatus,
+    terminationDate: record.terminationDate,
+    llcId: record.llcId,
+    w2Salary: record.w2Salary,
+    grant: null, // attached below from valuation snapshot
+  };
+}
+
 /**
  * Returns all employees for a given LLC (LLC Owner view).
- * Vested amounts and payout values are computed live from each grant's
- * schedule and the LLC's valuation history, so they stay correct as time passes.
+ * Seeded grant details come from the LLC's valuation snapshot (strike price
+ * from the latest valuation at grant time); vested amounts and payout values
+ * are computed live from each grant's schedule and the LLC's valuation
+ * history, so they stay correct as time passes.
  */
 export function getEmployeesByLLC(llcId: string): Employee[] {
-  return mockEmployees
-    .filter((emp) => emp.llcId === llcId)
+  const llc = getLLCDetails(llcId);
+  return getEmployeeRecordsForLLC(llcId)
+    .map(recordToEmployee)
+    .map((emp) => withSeedGrant(emp, llc))
     .map((emp) => withLiveVesting(emp));
 }
 
 /** Returns a single employee by ID. */
 export function getEmployee(employeeId: string): Employee | null {
-  const emp = mockEmployees.find((emp) => emp.id === employeeId) ?? null;
-  return emp ? withLiveVesting(emp) : null;
+  const record = getEmployeeRecordById(employeeId);
+  if (!record) return null;
+  const emp = withSeedGrant(recordToEmployee(record), getLLCDetails(record.llcId));
+  return withLiveVesting(emp);
 }
 
 /** Returns all employees across all LLCs (Platform Admin view). */
 export function getAllEmployees(): Employee[] {
-  return mockEmployees.map((emp) => withLiveVesting(emp));
+  return getEmployeeRecords().map((record) =>
+    withLiveVesting(
+      withSeedGrant(recordToEmployee(record), getLLCDetails(record.llcId))
+    )
+  );
 }
 
 /** Returns all employees with grants for a given LLC. */
@@ -140,10 +174,69 @@ export function getTopUnitHolders(
   return segments;
 }
 
+/**
+ * Seed grant definitions: the demo awards each employee holds at first load.
+ * Grant dates/cliffs/completions mirror the original seed data so vesting
+ * progress matches what the owner dashboard has always shown.
+ */
+const SEED_GRANTS: Record<
+  string,
+  {
+    unitsAwarded: number;
+    grantDate: string;
+    cliffDate: string;
+    vestingCompletionDate: string;
+    scheduleLengthMonths: number;
+    contractDocumentName: string;
+  }
+> = {
+  "emp-1": { unitsAwarded: 1000, grantDate: "2025-07-01", cliffDate: "2026-07-01", vestingCompletionDate: "2028-07-01", scheduleLengthMonths: 36, contractDocumentName: "Summit_HVAC_Whitfield_Contract.pdf" },
+  "emp-2": { unitsAwarded: 1500, grantDate: "2024-03-01", cliffDate: "2025-03-01", vestingCompletionDate: "2027-03-01", scheduleLengthMonths: 36, contractDocumentName: "Summit_HVAC_Martinez_Contract.pdf" },
+  "emp-3": { unitsAwarded: 500, grantDate: "2025-01-15", cliffDate: "2026-01-15", vestingCompletionDate: "2028-01-15", scheduleLengthMonths: 36, contractDocumentName: "Summit_HVAC_Brennan_Contract.pdf" },
+  "emp-4": { unitsAwarded: 2000, grantDate: "2025-10-01", cliffDate: "2026-10-01", vestingCompletionDate: "2029-10-01", scheduleLengthMonths: 48, contractDocumentName: "Ironclad_Nakamura_Contract.pdf" },
+  "emp-5": { unitsAwarded: 1200, grantDate: "2024-06-01", cliffDate: "2025-06-01", vestingCompletionDate: "2027-06-01", scheduleLengthMonths: 36, contractDocumentName: "Ironclad_Johnson_Contract.pdf" },
+  "emp-6": { unitsAwarded: 420, grantDate: "2024-05-10", cliffDate: "2025-05-10", vestingCompletionDate: "2027-05-10", scheduleLengthMonths: 36, contractDocumentName: "Summit_HVAC_Foster_Contract.pdf" },
+  "emp-7": { unitsAwarded: 450, grantDate: "2024-11-20", cliffDate: "2025-11-20", vestingCompletionDate: "2028-11-20", scheduleLengthMonths: 48, contractDocumentName: "Summit_HVAC_Okafor_Contract.pdf" },
+  "emp-8": { unitsAwarded: 210, grantDate: "2025-04-01", cliffDate: "2026-04-01", vestingCompletionDate: "2027-04-01", scheduleLengthMonths: 24, contractDocumentName: "Summit_HVAC_Raman_Contract.pdf" },
+  "emp-9": { unitsAwarded: 380, grantDate: "2025-08-15", cliffDate: "2026-08-15", vestingCompletionDate: "2028-08-15", scheduleLengthMonths: 36, contractDocumentName: "Summit_HVAC_Salazar_Contract.pdf" },
+  "emp-10": { unitsAwarded: 165, grantDate: "2025-12-01", cliffDate: "2026-12-01", vestingCompletionDate: "2027-12-01", scheduleLengthMonths: 24, contractDocumentName: "Summit_HVAC_Liu_Contract.pdf" },
+  "emp-11": { unitsAwarded: 325, grantDate: "2024-02-01", cliffDate: "2025-02-01", vestingCompletionDate: "2027-02-01", scheduleLengthMonths: 36, contractDocumentName: "Summit_HVAC_Boyd_Contract.pdf" },
+};
+
+/**
+ * Attaches the seeded grant (the employee's original phantom equity award) to
+ * an employee record. Strike price is the certified price in effect at grant
+ * date, derived from the LLC's valuation history.
+ */
+function withSeedGrant(employee: Employee, llc: LLC | null): Employee {
+  const seed = SEED_GRANTS[employee.id];
+  if (!seed || !llc) return employee;
+  const strikePrice = strikePriceAt(llc.valuationHistory, seed.grantDate);
+  employee.grant = {
+    unitsAwarded: seed.unitsAwarded,
+    strikePricePerUnit: strikePrice,
+    grantDate: seed.grantDate,
+    contractDocumentName: seed.contractDocumentName,
+    vesting: {
+      scheduleType: "standard",
+      grantDate: seed.grantDate,
+      cliffDate: seed.cliffDate,
+      vestingCompletionDate: seed.vestingCompletionDate,
+      scheduleLengthMonths: seed.scheduleLengthMonths,
+      monthlyVestingRate: seed.unitsAwarded / Math.max(seed.scheduleLengthMonths - 12, 1),
+      vestingTriggers: [],
+      vestingSlowdowns: [],
+    },
+    currentVestedAmount: 0, // recomputed live in withLiveVesting
+    currentPayoutValue: 0,
+  };
+  return employee;
+}
+
 /** Replaces seed vested amounts with schedule-derived values as of today. */
 function withLiveVesting(employee: Employee): Employee {
   if (!employee.grant) return employee;
-  const llc = mockLLCs.find((llc) => llc.id === employee.llcId);
+  const llc = mockLLCs.find((item) => item.id === employee.llcId);
   const history = llc?.valuationHistory ?? [];
   const units = employeeVestedUnits(employee);
   return {

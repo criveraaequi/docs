@@ -145,8 +145,8 @@ export function GrantPage({ llcId }: GrantPageProps) {
             pool until the agreement is signed.
           </p>
           <p className="wizard-confirm-demo">
-            Demo tip: use the "Simulate employee signing" button on the employee's page or the
-            pending grants list to walk through the signature step.
+            Demo tip: open the employee's portal (via the "View as" switcher in the top bar) to
+            accept or decline the agreement as the employee would.
           </p>
           <div className="wizard-actions flow-confirm-actions">
             <button className="button-primary" type="button" onClick={() => navigate("/")}>
