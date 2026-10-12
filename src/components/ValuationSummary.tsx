@@ -1,4 +1,5 @@
 import { ArrowUpRight } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { Analyst, LLC, ValuationEvent } from "@/data/types";
 import { formatDate } from "./ValuationDetailModal";
@@ -53,9 +54,9 @@ export function ValuationSummary({ llc, analyst, onSelectValuation }: ValuationS
         </ResponsiveContainer>
       </div>
       <div className="chart-note"><span className="chart-line" /> Certified values only <span className="analyst-note">Analyst: {analyst?.name ?? "—"}</span></div>
-      <a className="card-link" href="#valuation-history" onClick={(event) => { event.preventDefault(); window.history.pushState({}, "", `/valuation-history/${llc.id}`); window.dispatchEvent(new PopStateEvent("popstate")); }}>
+      <Link className="card-link" to={`/valuation-history/${llc.id}`}>
         View full valuation history <ArrowUpRight size={15} />
-      </a>
+      </Link>
     </section>
   );
 }
