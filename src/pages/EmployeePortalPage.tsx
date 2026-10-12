@@ -15,7 +15,6 @@ import {
   YAxis,
 } from "recharts";
 import { EmployeeShell } from "@/components/EmployeeShell";
-import { ContractDocument } from "@/components/ContractDocument";
 import { formatDate } from "@/components/ValuationDetailModal";
 import {
   acceptGrant,
@@ -25,7 +24,7 @@ import {
   type GrantRecord,
 } from "@/data/grantStore";
 import { getEmployeeRecords } from "@/data/employeeStore";
-import { getAuthorizedUser, getEmployee, getEngagementStatus, getLLCDetails } from "@/data/mockApi";
+import { getEmployee, getEngagementStatus, getLLCDetails } from "@/data/mockApi";
 import { useGrantStore } from "@/data/useGrantStore";
 import type { EquityGrant, ValuationEvent } from "@/data/types";
 import { fullMonthsBetween, todayIso, vestedUnitsAsOf } from "@/data/vesting";
@@ -222,13 +221,11 @@ export function EmployeePortalPage() {
             latestPrice={latestPrice}
             busy={busy === view.key}
             actionError={actionError}
-            grantRecord={
+            contractLink={
               view.contractId
-                ? runtimeGrants.find((grant) => grant.id === view.contractId)!
-                : contractRecordFor(view, employee.name, employee.roleOrPosition, llc.id)
+                ? `/portal/${employee.id}/contracts/${view.contractId}`
+                : `/portal/${employee.id}/contracts/seeded-${employee.id}`
             }
-            llc={llc}
-            owner={getAuthorizedUser(llc.id)}
             onAccept={() => void decide(view.key, "accept")}
             onReject={() => void decide(view.key, "reject")}
             revising={revising === view.key}
@@ -262,30 +259,6 @@ export function EmployeePortalPage() {
   );
 }
 
-/** Builds a persisted GrantRecord shape for the contract document renderer. */
-function contractRecordFor(view: GrantView, employeeName: string, employeeRole: string, llcId: string): GrantRecord {
-  return {
-    id: view.key,
-    llcId,
-    employeeId: view.key === "seed" ? "seeded" : view.key,
-    employeeName,
-    employeeRole,
-    unitsAwarded: view.grant.unitsAwarded,
-    strikePricePerUnit: view.grant.strikePricePerUnit,
-    grantDate: view.grant.grantDate,
-    scheduleLengthMonths: view.grant.vesting.scheduleLengthMonths,
-    cliffDate: view.grant.vesting.cliffDate,
-    vestingCompletionDate: view.grant.vesting.vestingCompletionDate,
-    monthlyVestingRate: view.grant.vesting.monthlyVestingRate,
-    vestingTriggers: view.grant.vesting.vestingTriggers,
-    vestingSlowdowns: view.grant.vesting.vestingSlowdowns,
-    contractDocumentName: view.grant.contractDocumentName,
-    status: view.status === "rejected" ? "rejected" : view.status,
-    signedAt: view.status === "active" ? new Date().toISOString() : null,
-    createdAt: view.grant.grantDate,
-  };
-}
-
 interface AgreementCardProps {
   index: number;
   view: GrantView & { vestedUnits: number; vestedValue: number };
@@ -293,9 +266,7 @@ interface AgreementCardProps {
   latestPrice: number;
   busy: boolean;
   actionError: string | null;
-  grantRecord: GrantRecord;
-  llc: NonNullable<ReturnType<typeof getLLCDetails>>;
-  owner: ReturnType<typeof getAuthorizedUser>;
+  contractLink: string;
   onAccept: () => void;
   onReject: () => void;
   revising: boolean;
@@ -315,9 +286,7 @@ function AgreementCard({
   latestPrice,
   busy,
   actionError,
-  grantRecord,
-  llc,
-  owner,
+  contractLink,
   onAccept,
   onReject,
   revising,
@@ -476,10 +445,9 @@ function AgreementCard({
         </div>
       )}
 
-      <details className="contract-collapse">
-        <summary>View full agreement document <ArrowUpRight size={13} /></summary>
-        <ContractDocument grant={grantRecord} llc={llc} owner={owner} />
-      </details>
+      <Link className="card-link" to={contractLink}>
+        View full agreement document <ArrowUpRight size={15} />
+      </Link>
     </section>
   );
 }
