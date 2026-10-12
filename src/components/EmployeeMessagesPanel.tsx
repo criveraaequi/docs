@@ -1,6 +1,7 @@
-// Aequi — Employee-private direct messages with the Aequi analyst.
+// Aequi — Employee-private direct messages with their employer (LLC owner).
 // Mirrors the owner MessagesPanel design but scoped to one employee's own
-// thread; the LLC owner never sees these conversations (role map).
+// thread with their company; the owner's conversation list does not show
+// employee threads in this build (role map refinement pending).
 import { Maximize2, Minimize2, Send, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -9,18 +10,17 @@ import {
   sendEmployeeMessage,
 } from "@/data/grantStore";
 import { useGrantStore } from "@/data/useGrantStore";
-import type { ContactType, MessageRecord } from "@/data/grantStore";
+import type { MessageRecord } from "@/data/grantStore";
 
 interface EmployeeMessagesPanelProps {
   llcId: string;
   employeeId: string;
-  contactType: ContactType;
   onClose: () => void;
 }
 
-const CONTACT_META: Record<ContactType, { name: string; role: string }> = {
-  analyst: { name: "Dr. Eleanor Cho", role: "Aequi Certified Analyst · CVA" },
-  cpa: { name: "Cho & Associates CPA PLLC", role: "CPA Firm" },
+const EMPLOYER_META = {
+  name: "Your employer",
+  role: "Company — Equity Administrator",
 };
 
 const timeFormatter = new Intl.DateTimeFormat("en-US", {
@@ -54,7 +54,6 @@ function groupByDay(messages: MessageRecord[]): { day: string; items: MessageRec
 export function EmployeeMessagesPanel({
   llcId,
   employeeId,
-  contactType,
   onClose,
 }: EmployeeMessagesPanelProps) {
   useGrantStore();
@@ -65,17 +64,17 @@ export function EmployeeMessagesPanel({
   const [sendError, setSendError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
-  const contact = CONTACT_META[contactType];
+  const contact = EMPLOYER_META;
   const messages = useMemo(
-    () => getEmployeeMessages(llcId, employeeId, contactType),
-    [llcId, employeeId, contactType]
+    () => getEmployeeMessages(llcId, employeeId, "employer"),
+    [llcId, employeeId]
   );
 
   useEffect(() => {
-    void markEmployeeConversationRead(llcId, employeeId, contactType).catch(() => {
+    void markEmployeeConversationRead(llcId, employeeId, "employer").catch(() => {
       // Non-fatal: unread badge will simply persist.
     });
-  }, [llcId, employeeId, contactType]);
+  }, [llcId, employeeId]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -87,7 +86,7 @@ export function EmployeeMessagesPanel({
     setSendError(null);
     setSending(true);
     try {
-      await sendEmployeeMessage(llcId, employeeId, contactType, draft);
+      await sendEmployeeMessage(llcId, employeeId, "employer", draft);
       setDraft("");
     } catch {
       setSendError("Couldn't send the message. Check your connection and try again.");

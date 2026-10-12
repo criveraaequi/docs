@@ -58,7 +58,7 @@ export interface NotificationRecord {
   createdAt: string;
 }
 
-export type ContactType = "analyst" | "cpa";
+export type ContactType = "analyst" | "cpa" | "employer";
 
 export interface ConversationRecord {
   id: string;
@@ -676,7 +676,7 @@ const CPA_CONTACT: { contactType: ContactType; contactName: string } = {
 };
 
 export function getConversationsForLLC(llcId: string): ConversationRecord[] {
-  return (conversationsCache ?? []).filter((c) => c.llcId === llcId && c.employeeId === null);
+  return (conversationsCache ?? []).filter((c) => c.llcId === llcId);
 }
 
 export function getMessagesForConversation(conversationId: string): MessageRecord[] {
@@ -748,13 +748,17 @@ async function ensureEmployeeConversation(
   );
   if (existing) return existing;
 
-  const contact = contactType === "analyst" ? ANALYST_CONTACT : CPA_CONTACT;
+  // Employer threads carry the employee's name as the contact name so the
+  // owner sees who they're talking to; analyst/CPA threads keep contact names.
+  const contactName = contactType === "employer"
+    ? getEmployeeRecordById(employeeId)?.name ?? "Employee"
+    : (contactType === "analyst" ? ANALYST_CONTACT.contactName : CPA_CONTACT.contactName);
   const { data, error } = await supabase
     .from("conversations")
     .insert({
       llc_id: llcId,
-      contact_type: contact.contactType,
-      contact_name: contact.contactName,
+      contact_type: contactType,
+      contact_name: contactName,
       employee_id: employeeId,
     })
     .select("*")

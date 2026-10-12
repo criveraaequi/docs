@@ -152,7 +152,6 @@ export function EmployeePortalPage() {
   const totalVestedValue = liveViews.reduce((sum, view) => sum + view.vestedValue, 0);
 
   const engagement = getEngagementStatus(llc.id);
-  const analystEngaged = engagement !== null && engagement.currentStage !== "Requested" && engagement.currentStage !== "Matching";
   const isPreCertification = engagement !== null && engagement.currentStage !== "Certified";
 
   const decide = async (grantId: string, decision: "accept" | "reject") => {
@@ -247,11 +246,17 @@ export function EmployeePortalPage() {
           />
         ))}
 
-        <ValuationHistoryCard
-          history={history}
-          isPreCertification={isPreCertification}
-          analystEngaged={analystEngaged}
-        />
+        <Link className="valuation-history-link" to={`/portal/${employee.id}/valuations`}>
+          <div>
+            <span className="eyebrow">Company valuations</span>
+            <strong>View full valuation history</strong>
+            <span className="valuation-history-sub">
+              {history.length} valuation event{history.length === 1 ? "" : "s"}
+              {isPreCertification ? " · latest figure preliminary" : ""}
+            </span>
+          </div>
+          <ArrowUpRight size={16} />
+        </Link>
       </div>
     </EmployeeShell>
   );
@@ -542,57 +547,5 @@ function VestingChart({
         </AreaChart>
       </ResponsiveContainer>
     </div>
-  );
-}
-
-function ValuationHistoryCard({
-  history,
-  isPreCertification,
-  analystEngaged,
-}: {
-  history: ValuationEvent[];
-  isPreCertification: boolean;
-  analystEngaged: boolean;
-}) {
-  const analystName = "Dr. Eleanor Cho";
-  return (
-    <section className="card">
-      <div className="card-heading">
-        <div>
-          <span className="eyebrow">Company valuations</span>
-          <h2>Valuation history</h2>
-        </div>
-        {isPreCertification && <span className="preliminary-pill">Latest figure preliminary</span>}
-      </div>
-      {history.length === 0 ? (
-        <p className="empty-state">No certified valuations yet.</p>
-      ) : (
-        <ul className="employee-valuation-list">
-          {history.map((event, index) => {
-            const isLatest = index === history.length - 1;
-            return (
-              <li key={event.date} className="employee-valuation-row">
-                <div>
-                  <strong>{formatDate(event.date)}</strong>
-                  <span>{event.cpaFirm ?? "Independent valuation"}</span>
-                </div>
-                <div className="employee-valuation-figures">
-                  <strong>{currency.format(event.valuationAmount)}</strong>
-                  <span>${event.resultingStrikePrice.toFixed(2)} / unit</span>
-                </div>
-                {isLatest && isPreCertification && (
-                  <span className="status-label status-pending">Preliminary</span>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-      {analystEngaged && (
-        <p className="employee-analyst-note">
-          Valuation performed by <strong>{analystName}</strong>, CVA — Aequi Certified Analyst.
-        </p>
-      )}
-    </section>
   );
 }

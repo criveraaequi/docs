@@ -6,6 +6,7 @@ import { ValuationHistoryPage } from "@/pages/ValuationHistoryPage";
 import { EmployeeListPage } from "@/pages/EmployeeListPage";
 import { EmployeeDetailPage } from "@/pages/EmployeeDetailPage";
 import { EmployeePortalPage } from "@/pages/EmployeePortalPage";
+import { EmployeeValuationsPage } from "@/pages/EmployeeValuationsPage";
 import { ContractsPage } from "@/pages/ContractsPage";
 import { ContractViewerPage } from "@/pages/ContractViewerPage";
 import { GrantPage } from "@/pages/GrantPage";
@@ -20,6 +21,7 @@ function App() {
     <Route path="/employees" element={<EmployeeListPage />} />
     <Route path="/employees/:employeeId" element={<EmployeeDetailPage />} />
     <Route path="/portal/:employeeId" element={<EmployeePortalPage />} />
+    <Route path="/portal/:employeeId/valuations" element={<EmployeeValuationsPage />} />
     <Route path="/contracts" element={<ContractsPage />} />
     <Route path="/contracts/:grantId" element={<ContractViewerPage />} />
     <Route path="/grants/new" element={<GrantPage llcId="llc-1" />} />

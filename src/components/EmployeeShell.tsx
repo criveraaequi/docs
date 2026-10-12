@@ -7,7 +7,6 @@ import { Link } from "react-router-dom";
 import {
   getEmployeeUnreadMessageCount,
   markEmployeeConversationRead,
-  type ContactType,
 } from "@/data/grantStore";
 import { useGrantStore } from "@/data/useGrantStore";
 import type { Employee } from "@/data/types";
@@ -27,7 +26,7 @@ export function EmployeeShell({ employee, children }: EmployeeShellProps) {
   useGrantStore();
 
   const llcName = LLC_NAMES[employee.llcId] ?? employee.llcId;
-  const unreadMessages = getEmployeeUnreadMessageCount(employee.llcId, employee.id, "analyst");
+  const unreadMessages = getEmployeeUnreadMessageCount(employee.llcId, employee.id, "employer");
 
   useEffect(() => {
     if (!notifOpen) return;
@@ -42,7 +41,7 @@ export function EmployeeShell({ employee, children }: EmployeeShellProps) {
 
   const openMessages = () => {
     setMessagesOpen(true);
-    void markEmployeeConversationRead(employee.llcId, employee.id, "analyst").catch(() => {
+    void markEmployeeConversationRead(employee.llcId, employee.id, "employer").catch(() => {
       // Non-fatal: unread badge will simply persist.
     });
   };
@@ -108,7 +107,6 @@ export function EmployeeShell({ employee, children }: EmployeeShellProps) {
         <EmployeeMessagesPanel
           llcId={employee.llcId}
           employeeId={employee.id}
-          contactType={"analyst" as ContactType}
           onClose={() => setMessagesOpen(false)}
         />
       )}

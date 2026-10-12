@@ -21,6 +21,7 @@ interface MessagesPanelProps {
 const CONTACT_META: Record<ContactType, { role: string }> = {
   analyst: { role: "Aequi Certified Analyst · CVA" },
   cpa: { role: "CPA Firm" },
+  employer: { role: "Company — Equity Administrator" },
 };
 
 const timeFormatter = new Intl.DateTimeFormat("en-US", {
