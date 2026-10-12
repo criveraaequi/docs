@@ -790,14 +790,6 @@ export async function sendEmployeeMessage(
   return record;
 }
 
-/** Opens (or finds) the private owner-to-employee thread. */
-export async function startEmployerConversation(
-  llcId: string,
-  employeeId: string
-): Promise<ConversationRecord> {
-  return ensureEmployeeConversation(llcId, employeeId, "employer");
-}
-
 /** Owner sends a message on a private owner-to-employee thread. */
 export async function sendOwnerToEmployeeMessage(
   llcId: string,

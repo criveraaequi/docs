@@ -11,7 +11,6 @@ import {
   markConversationRead,
   sendMessage,
   sendOwnerToEmployeeMessage,
-  startEmployerConversation,
 } from "@/data/grantStore";
 import { useGrantStore } from "@/data/useGrantStore";
 import { getEmployeeRecordById, getEmployeeRecords } from "@/data/employeeStore";
@@ -66,27 +65,29 @@ export function MessagesPanel({ llcId, onClose }: MessagesPanelProps) {
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [employeesOpen, setEmployeesOpen] = useState(false);
-  const [startingChat, setStartingChat] = useState<string | null>(null);
+  const [previewEmployeeId, setPreviewEmployeeId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const conversations = getConversationsForLLC(llcId);
   const unreadTotal = getUnreadMessageCount(llcId);
+  // Employee threads that were opened but never messaged stay out of the list.
+  const visibleConversations = conversations.filter(
+    (c) => c.employeeId === null || getMessagesForConversation(c.id).length > 0
+  );
   const selected = conversations.find((c) => c.id === selectedId) ?? null;
-  const selectedEmployee = selected?.employeeId
-    ? getEmployeeRecordById(selected.employeeId)
-    : null;
+  const previewEmployee = previewEmployeeId ? getEmployeeRecordById(previewEmployeeId) : null;
   const messages = useMemo(
     () => (selected ? getMessagesForConversation(selected.id) : []),
     [selected]
   );
 
-  // Employees who don't have a thread yet — once a conversation starts they
+  // Employees who don't have a real thread yet — once a message is sent they
   // move up into the conversation list and leave this picker.
   const activeEmployees = getEmployeeRecords().filter(
     (employee) => employee.employmentStatus === "active"
   );
   const employeesWithThreads = new Set(
-    conversations.map((c) => c.employeeId).filter((id): id is string => id !== null)
+    visibleConversations.map((c) => c.employeeId).filter((id): id is string => id !== null)
   );
   const availableEmployees = activeEmployees.filter(
     (employee) => !employeesWithThreads.has(employee.id)
@@ -120,13 +121,18 @@ export function MessagesPanel({ llcId, onClose }: MessagesPanelProps) {
   }, [messages.length, selectedId]);
 
   const handleSend = async () => {
-    if (!selected || !draft.trim() || sending) return;
+    if (!draft.trim() || sending) return;
     setSendError(null);
     setSending(true);
     try {
-      if (selected.employeeId) {
+      if (previewEmployeeId) {
+        // First message creates the stored thread; until then it's draft-only.
+        const record = await sendOwnerToEmployeeMessage(llcId, previewEmployeeId, draft);
+        setPreviewEmployeeId(null);
+        setSelectedId(record.conversationId);
+      } else if (selected?.employeeId) {
         await sendOwnerToEmployeeMessage(llcId, selected.employeeId, draft);
-      } else {
+      } else if (selected) {
         await sendMessage(llcId, selected.contactType, draft);
       }
       setDraft("");
@@ -137,18 +143,9 @@ export function MessagesPanel({ llcId, onClose }: MessagesPanelProps) {
     }
   };
 
-  const handleStartChat = async (employee: EmployeeRecord) => {
-    if (startingChat) return;
-    setStartingChat(employee.id);
-    try {
-      const conversation = await startEmployerConversation(llcId, employee.id);
-      setSelectedId(conversation.id);
-      setEmployeesOpen(false);
-    } catch {
-      setSendError("Couldn't start the conversation. Check your connection and try again.");
-    } finally {
-      setStartingChat(null);
-    }
+  const handlePreviewChat = (employee: EmployeeRecord) => {
+    setPreviewEmployeeId(employee.id);
+    setEmployeesOpen(false);
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -195,12 +192,12 @@ export function MessagesPanel({ llcId, onClose }: MessagesPanelProps) {
         <div className="messages-body">
           <div className="conversation-column">
             <ul className="conversation-list">
-              {conversations.length === 0 && (
+              {visibleConversations.length === 0 && (
                 <li className="conversation-empty-note">
                   No conversations yet — pick an employee below or wait for your analyst to reach out.
                 </li>
               )}
-              {conversations.map((conversation) => {
+              {visibleConversations.map((conversation) => {
                 const thread = getMessagesForConversation(conversation.id);
                 const last = thread[thread.length - 1];
                 const hasUnread = thread.some(
@@ -210,8 +207,11 @@ export function MessagesPanel({ llcId, onClose }: MessagesPanelProps) {
                   <li key={conversation.id}>
                     <button
                       type="button"
-                      className={`conversation-item${conversation.id === selected?.id ? " is-selected" : ""}`}
-                      onClick={() => setSelectedId(conversation.id)}
+                      className={`conversation-item${conversation.id === selected?.id && !previewEmployee ? " is-selected" : ""}`}
+                      onClick={() => {
+                        setSelectedId(conversation.id);
+                        setPreviewEmployeeId(null);
+                      }}
                     >
                       <span className="conversation-avatar">{conversation.contactName.slice(0, 1)}</span>
                       <span className="conversation-meta">
@@ -252,8 +252,7 @@ export function MessagesPanel({ llcId, onClose }: MessagesPanelProps) {
                       <button
                         className="employees-picker-item"
                         type="button"
-                        disabled={startingChat !== null}
-                        onClick={() => void handleStartChat(employee)}
+                        onClick={() => handlePreviewChat(employee)}
                       >
                         <span className="conversation-avatar employees-picker-avatar">
                           {employee.name.slice(0, 1)}
@@ -270,15 +269,26 @@ export function MessagesPanel({ llcId, onClose }: MessagesPanelProps) {
             </div>
           </div>
             <div className="thread-pane">
-              {selected ? (
+              {previewEmployee ? (
+                <EmployeeDraftThread
+                  employee={previewEmployee}
+                  draft={draft}
+                  sending={sending}
+                  sendError={sendError}
+                  onDraftChange={setDraft}
+                  onSend={() => void handleSend()}
+                  onKeyDown={handleKeyDown}
+                />
+              ) : selected ? (
                 <>
                   <div className="thread-header">
                     <span className="thread-avatar">{selected.contactName.slice(0, 1)}</span>
                     <div>
                       <strong>{selected.contactName}</strong>
                       <small>
-                        {selectedEmployee
-                          ? selectedEmployee.roleOrPosition
+                        {selected.employeeId
+                          ? getEmployeeRecordById(selected.employeeId)?.roleOrPosition ??
+                            CONTACT_META[selected.contactType].role
                           : CONTACT_META[selected.contactType].role}
                       </small>
                     </div>
@@ -333,5 +343,61 @@ export function MessagesPanel({ llcId, onClose }: MessagesPanelProps) {
         </div>
       </section>
     </div>
+  );
+}
+
+interface DraftThreadProps {
+  employee: EmployeeRecord;
+  draft: string;
+  sending: boolean;
+  sendError: string | null;
+  onDraftChange: (value: string) => void;
+  onSend: () => void;
+  onKeyDown: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+}
+
+/** Draft view for a picked employee — nothing is stored until a message is sent. */
+function EmployeeDraftThread({
+  employee,
+  draft,
+  sending,
+  sendError,
+  onDraftChange,
+  onSend,
+  onKeyDown,
+}: DraftThreadProps) {
+  return (
+    <>
+      <div className="thread-header">
+        <span className="thread-avatar">{employee.name.slice(0, 1)}</span>
+        <div>
+          <strong>{employee.name}</strong>
+          <small>{employee.roleOrPosition}</small>
+        </div>
+      </div>
+      <div className="thread-scroll">
+        <p className="thread-empty">No messages yet — say hello.</p>
+      </div>
+      <div className="thread-composer">
+        <textarea
+          value={draft}
+          placeholder={`Message ${employee.name}…`}
+          aria-label={`Message ${employee.name}`}
+          rows={3}
+          onChange={(event) => onDraftChange(event.target.value)}
+          onKeyDown={onKeyDown}
+        />
+        {sendError && <p className="thread-send-error">{sendError}</p>}
+        <button
+          className="button-primary thread-send-button"
+          type="button"
+          disabled={!draft.trim() || sending}
+          onClick={onSend}
+        >
+          <Send size={15} />
+          <span>{sending ? "Sending…" : "Send"}</span>
+        </button>
+      </div>
+    </>
   );
 }
