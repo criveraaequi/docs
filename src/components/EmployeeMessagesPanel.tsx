@@ -3,7 +3,7 @@
 // thread with their company; the owner's conversation list does not show
 // employee threads in this build (role map refinement pending).
 import { Maximize2, Minimize2, Send, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   getEmployeeMessages,
   markEmployeeConversationRead,
@@ -65,10 +65,7 @@ export function EmployeeMessagesPanel({
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const contact = EMPLOYER_META;
-  const messages = useMemo(
-    () => getEmployeeMessages(llcId, employeeId, "employer"),
-    [llcId, employeeId]
-  );
+  const messages = getEmployeeMessages(llcId, employeeId, "employer");
 
   useEffect(() => {
     void markEmployeeConversationRead(llcId, employeeId, "employer").catch(() => {

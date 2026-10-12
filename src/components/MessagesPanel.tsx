@@ -3,7 +3,7 @@
 // One ongoing thread per contact per LLC.
 
 import { ChevronDown, Maximize2, Minimize2, Send, Users, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   getConversationsForLLC,
   getMessagesForConversation,
@@ -76,10 +76,7 @@ export function MessagesPanel({ llcId, onClose }: MessagesPanelProps) {
   );
   const selected = conversations.find((c) => c.id === selectedId) ?? null;
   const previewEmployee = previewEmployeeId ? getEmployeeRecordById(previewEmployeeId) : null;
-  const messages = useMemo(
-    () => (selected ? getMessagesForConversation(selected.id) : []),
-    [selected]
-  );
+  const messages = selected ? getMessagesForConversation(selected.id) : [];
 
   // Employees who don't have a real thread yet — once a message is sent they
   // move up into the conversation list and leave this picker.
