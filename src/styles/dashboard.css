@@ -355,6 +355,11 @@
 
 .wizard-slowdowns-section { margin-top: 20px; padding-top: 14px; border-top: 1px dashed rgba(138, 147, 163, 0.35); }
 .wizard-slowdowns-section .wizard-field-label { display: block; }
+.wizard-field-block > .wizard-field-label {
+  display: block;
+  text-align: center;
+  margin-bottom: 10px;
+}
 .wizard-trigger-row select {
   border: 1px solid rgba(138, 147, 163, 0.4); border-radius: 6px; background: #fff;
   padding: 8px 10px; font: 400 0.85rem/1.2 "Work Sans", sans-serif; color: #23272f; cursor: pointer;
