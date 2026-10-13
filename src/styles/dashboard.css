@@ -16,6 +16,7 @@
 .mobile-menu-button { display: none; color: var(--navy); }
 .page-content { max-width: 1240px; margin: 0 auto; padding: 56px 48px 80px; }
 .page-intro { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 32px; }
+.page-intro, .payout-hero, .back-link { scroll-margin-top: 24px; }
 .eyebrow { display: block; color: var(--slate); font-size: 11px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; margin-bottom: 8px; }
 .page-intro h1 { font-size: 31px; letter-spacing: -.025em; }
 .mock-badge { padding: 5px 9px; border: 1px solid rgba(184, 118, 62, .38); border-radius: 4px; color: var(--amber); font-size: 11px; font-weight: 500; }
