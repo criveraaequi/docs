@@ -69,7 +69,7 @@ export function PoolExpansionPage({ llcId }: PoolExpansionPageProps) {
         </div>
       </div>
 
-      <section className="card flow-card">
+      <section className="card flow-card step-transition" key={step}>
         <div className="wizard-steps" aria-label={`Step ${step} of 3`}>
           {[1, 2, 3].map((marker) => (
             <span

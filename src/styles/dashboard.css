@@ -231,13 +231,17 @@
   animation: page-enter 0.28s ease both;
 }
 
+.step-transition {
+  animation: page-enter 0.28s ease both;
+}
+
 @keyframes page-enter {
   from { opacity: 0; }
   to { opacity: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .page-transition { animation: none; }
+  .page-transition, .step-transition { animation: none; }
 }
 
 /* --- Page intro actions / buttons -------------------------------------- */
