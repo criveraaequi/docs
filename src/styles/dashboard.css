@@ -240,8 +240,16 @@
   to { opacity: 1; }
 }
 
+@keyframes reveal-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .page-transition, .step-transition { animation: none; }
+  .wizard-trigger-row, .disclosure-open > :not(.disclosure-toggle),
+  .employees-picker.is-open .employees-picker-list,
+  .contract-collapse[open] > :not(summary) { animation: none; }
 }
 
 /* --- Page intro actions / buttons -------------------------------------- */
@@ -322,7 +330,7 @@
 }
 .wizard-triggers-collapse:hover { color: #1f3164; }
 
-.wizard-trigger-row { display: flex; align-items: flex-end; gap: 10px; margin-top: 10px; }
+.wizard-trigger-row { display: flex; align-items: flex-end; gap: 10px; margin-top: 10px; animation: reveal-in 0.22s ease; }
 .wizard-trigger-row label { display: flex; flex-direction: column; gap: 4px; flex: 1; }
 .wizard-trigger-row label span { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.04em; color: #8a93a3; }
 .wizard-trigger-row input {
@@ -737,6 +745,7 @@
 .contract-collapse > summary::-webkit-details-marker { display: none; }
 .contract-collapse > summary:hover { text-decoration: underline; }
 .contract-collapse[open] > summary { margin-bottom: 18px; }
+.contract-collapse[open] > :not(summary) { animation: reveal-in 0.22s ease; }
 .employee-valuation-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
 .employee-valuation-row {
   display: flex;
@@ -839,6 +848,7 @@
 .disclosure-chevron { color: var(--slate); flex-shrink: 0; transition: transform 0.2s ease; }
 .grant-agreement-card.disclosure-open .disclosure-chevron { transform: rotate(180deg); }
 .disclosure-open .card-heading { margin-bottom: 20px; padding-top: 18px; border-top: 1px solid var(--card-border); }
+.disclosure-open > :not(.disclosure-toggle) { animation: reveal-in 0.22s ease; }
 
 /* --- Responsive ------------------------------------------------------------ */
 
@@ -942,6 +952,7 @@
 .employees-picker-toggle:hover { background: rgba(31, 49, 100, 0.05); }
 .employees-picker-chevron { margin-left: auto; transition: transform 0.15s ease; }
 .employees-picker.is-open .employees-picker-chevron { transform: rotate(180deg); }
+.employees-picker.is-open .employees-picker-list { animation: reveal-in 0.18s ease; }
 .employees-picker-list {
   list-style: none; margin: 0; padding: 6px;
   max-height: 240px; overflow-y: auto;
